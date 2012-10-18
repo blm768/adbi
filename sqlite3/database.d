@@ -61,8 +61,7 @@ class Sqlite3Database: Database {
 		}
 		
 		const(char)[] getText(size_t index) {
-			//To do: optimize.
-			return sqlite3_column_text(statement, index).to!(const(char)[]);
+			return sqlite3_column_text(statement, index)[0 .. sqlite3_column_bytes(statement, index)];
 		}
 		
 		const(void)[] getBlob(size_t index) {
