@@ -3,7 +3,7 @@ module adbi.type;
 import std.stdio;
 import std.traits;
 
-abstract class DBType {
+/+abstract class DBType {
 	
 }
 
@@ -27,7 +27,7 @@ class DBIntegralType: DBNativeType {
 	bool signed;
 }
 
-/+class DBFloatType: DBNativeType {
+class DBFloatType: DBNativeType {
 	enum Precision {Float, Double, Real};
 }
 
