@@ -7,6 +7,8 @@ import std.variant;
 import std.string;
 import std.traits;
 
+import std.stdio;
+
 public import adbi.database;
 
 pragma(lib, "sqlite3");
@@ -18,12 +20,22 @@ class Sqlite3Database: Database {
 			//The cast is hacky, but it seems to be needed for now. Ick.
 			throw new Sqlite3Error(status, "Unable to open database " ~ cast(immutable)filename);
 		}
+		super();
 	}
 	
 	Query query(const(char)[] statement) {
 		auto q = new Sqlite3Query;
 		q.statement = compileStatement(statement);
 		return q;
+	}
+	
+	void updateSchema() {
+		Query q = query("SELECT name FROM sqlite_master WHERE type='table';");
+		tables.clear();
+		while(q.advance() == QueryStatus.hasData) {
+			const(char)[] text = q.getText(0);
+			tables[text] = new Sqlite3Table(text);
+		}
 	}
 	
 	~this() {
@@ -39,6 +51,7 @@ class Sqlite3Database: Database {
 		QueryStatus advance() {
 			int status = sqlite3_step(statement);
 			with(QueryStatus) switch(status) {
+				//To do: handle busy case
 				case SQLITE_BUSY:
 					return busy;
 				case SQLITE_DONE:
@@ -50,12 +63,24 @@ class Sqlite3Database: Database {
 			}
 		}
 		
-		@property size_t numCols() {
+		void reset() {
+			int status = sqlite3_reset(statement);
+			if(status)
+				{throw new Sqlite3Error(status, "Unable to reset query");}
+		}
+		
+		@property size_t numColumns() {
 			return cast(size_t)sqlite3_column_count(statement);
 		}
 		
 		void bind(size_t index, int value) {
 			int status = sqlite3_bind_int(statement, index, value);
+			if(status)
+				{throw new Sqlite3BindError(status, value);}
+		}
+		
+		void bind(size_t index, long value) {
+			int status = sqlite3_bind_int64(statement, index, value);
 			if(status)
 				{throw new Sqlite3BindError(status, value);}
 		}
@@ -79,7 +104,12 @@ class Sqlite3Database: Database {
 				{throw new Sqlite3BindError(status, blob);}
 		}
 		
-		long getInt(size_t index) {
+		//To do: error checking?
+		int getInt(size_t index) {
+			return cast(long)sqlite3_column_int(statement, index);
+		}
+		
+		long getLong(size_t index) {
 			return cast(long)sqlite3_column_int64(statement, index);
 		}
 		
@@ -88,7 +118,7 @@ class Sqlite3Database: Database {
 		}
 		
 		const(char)[] getText(size_t index) {
-			return sqlite3_column_text(statement, index)[0 .. sqlite3_column_bytes(statement, index)];
+			return sqlite3_column_text(statement, index)[0 .. sqlite3_column_bytes(statement, index)].idup;
 		}
 		
 		const(void)[] getBlob(size_t index) {
@@ -107,22 +137,37 @@ class Sqlite3Database: Database {
 		sqlite3_stmt* statement;
 	}
 	
+	class Sqlite3Table: Table {
+		this(const(char)[] name) {
+			super(name);
+		}
+		
+		override void updateSchema() {
+			auto q = query("SELECT * FROM " ~ name ~ " LIMIT 0;");
+			size_t num = q.numColumns;
+			columns = uninitializedArray!(const(char)[][])(num);
+			for(size_t i = 0; i < q.numColumns; ++i) {
+				columns[i] = q.getColumnName(i);
+			}
+		}
+	}
+
 	protected:
 	sqlite3_stmt* compileStatement(const(char)[] statement) {
 		sqlite3_stmt* s;
 		int status = sqlite3_prepare_v2(connection, statement.ptr, statement.length, &s, null);
 		if(status) {
-			throw new Sqlite3Error(status, "");
+			throw new Sqlite3Error(status, "Unable to compile statement");
 		}
 		return s;
 	}
-	
+
 	private:
 	sqlite3* connection;
 }
 
 class Sqlite3Error: Error {
-	this(int code, string msg) {super("Sqlite error " ~ to!string(code) ~ ": " ~ msg);}
+	this(int code, string msg) {super(msg ~ " (Sqlite3 error " ~ to!string(code) ~ ")");}
 }
 
 class Sqlite3BindError: Sqlite3Error {
