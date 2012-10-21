@@ -42,14 +42,16 @@ abstract class Database {
 		@property const(char)[] name() const {
 			return _name;
 		}
-		const(char)[][] columns;
+		const(char)[][] columnNames;
+		size_t[string] columnIndices;
 		
 		private:
 		const(char)[] _name;
 	}
 }
 
-class Column {
+struct Column {
+	size_t index;
 	string name;
 }
 
@@ -74,5 +76,5 @@ interface Query {
 	const(char)[] getText(size_t index);
 	const(void)[] getBlob(size_t index);
 	
-	const(char)[] getColumnName(size_t index);
+	string getColumnName(size_t index);
 }

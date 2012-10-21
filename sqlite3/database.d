@@ -125,7 +125,7 @@ class Sqlite3Database: Database {
 			return sqlite3_column_blob(statement, index)[0 .. sqlite3_column_bytes(statement, index)];
 		}
 		
-		const(char)[] getColumnName(size_t index) {
+		string getColumnName(size_t index) {
 			return sqlite3_column_name(statement, index).to!string;
 		}
 	
@@ -145,9 +145,12 @@ class Sqlite3Database: Database {
 		override void updateSchema() {
 			auto q = query("SELECT * FROM " ~ name ~ " LIMIT 0;");
 			size_t num = q.numColumns;
-			columns = uninitializedArray!(const(char)[][])(num);
+			columnNames = uninitializedArray!(const(char)[][])(num);
+			columnIndices.clear();
 			for(size_t i = 0; i < q.numColumns; ++i) {
-				columns[i] = q.getColumnName(i);
+				string name = q.getColumnName(i);
+				columnNames[i] = name;
+				columnIndices[name] = i;
 			}
 		}
 	}
