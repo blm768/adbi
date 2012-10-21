@@ -49,18 +49,25 @@ class Sqlite3Database: Database {
 	//To do: file bug? (Just calling this Query gives an error.)
 	class Sqlite3Query: adbi.database.Query {
 		QueryStatus advance() {
-			int status = sqlite3_step(statement);
-			with(QueryStatus) switch(status) {
+			int qStatus = sqlite3_step(statement);
+			with(QueryStatus) switch(qStatus) {
 				//To do: handle busy case
 				case SQLITE_BUSY:
-					return busy;
+					_status =  busy;
 				case SQLITE_DONE:
-					return finished;
+					_status =  finished;
 				case SQLITE_ROW:
-					return hasData;
+					_status =  hasData;
 				default:
+					_status = finished;
 					throw new Sqlite3Error(status, "Error while evaluating statement");
 			}
+			assert(_status != QueryStatus.notStarted);
+			return _status;
+		}
+		
+		@property QueryStatus status() {
+			return _status;
 		}
 		
 		void reset() {
@@ -135,6 +142,7 @@ class Sqlite3Database: Database {
 		
 		private:
 		sqlite3_stmt* statement;
+		QueryStatus _status;
 	}
 	
 	class Sqlite3Table: Table {

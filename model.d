@@ -10,6 +10,10 @@ mixin template Model(string _tableName) {
 	static size_t[] memberToColumn; 
 	static size_t[] columnToMember;
 	
+	static void getNextFromQuery(Query q) {
+		q.advance();
+	}
+	
 	static void updateSchema(Database db) {
 		auto t = db.tables[tableName];
 		memberToColumn.length = 0;

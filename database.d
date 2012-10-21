@@ -56,11 +56,12 @@ struct Column {
 }
 
 enum QueryStatus {
-	hasData, finished, busy
+	notStarted, hasData, finished, busy
 }
 
 interface Query {
 	QueryStatus advance();
+	@property QueryStatus status();
 	void reset();
 	@property size_t numColumns();
 	
