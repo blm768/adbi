@@ -54,13 +54,17 @@ class Sqlite3Database: Database {
 				//To do: handle busy case
 				case SQLITE_BUSY:
 					_status =  busy;
+					break;
 				case SQLITE_DONE:
 					_status =  finished;
+					break;
 				case SQLITE_ROW:
 					_status =  hasData;
+					break;
 				default:
 					_status = finished;
-					throw new Sqlite3Error(status, "Error while evaluating statement");
+					throw new Sqlite3Error(qStatus, "Error while evaluating statement");
+					break;
 			}
 			assert(_status != QueryStatus.notStarted);
 			return _status;
