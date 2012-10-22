@@ -71,9 +71,29 @@ interface Query {
 	void bind(size_t index, const(char)[] text);
 	void bind(size_t index, const(void)[] blob);
 	
+	template get(T: int) {
+		alias getInt get;
+	}
+	
+	template get(T: long) {
+		alias getLong get;
+	}
+	
+	template get(T: double) {
+		alias getDouble get;
+	}
+	
+	template get(T: string) {
+		alias getText get; 
+	}
+	
+	template get(T: immutable(void)[]) {
+		alias getBlob get;
+	}
+	
 	int getInt(size_t index);
 	long getLong(size_t index);
-	double getFloat(size_t index);
+	double getDouble(size_t index);
 	const(char)[] getText(size_t index);
 	const(void)[] getBlob(size_t index);
 	

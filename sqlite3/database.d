@@ -74,10 +74,12 @@ class Sqlite3Database: Database {
 			return _status;
 		}
 		
+		//To do: unit tests to verify that status stays consistent
 		void reset() {
 			int status = sqlite3_reset(statement);
 			if(status)
 				{throw new Sqlite3Error(status, "Unable to reset query");}
+			_status = QueryStatus.notStarted;
 		}
 		
 		@property size_t numColumns() {
@@ -124,16 +126,16 @@ class Sqlite3Database: Database {
 			return cast(long)sqlite3_column_int64(statement, index);
 		}
 		
-		double getFloat(size_t index) {
+		double getDouble(size_t index) {
 			return sqlite3_column_double(statement, index);
 		}
 		
-		const(char)[] getText(size_t index) {
+		string getText(size_t index) {
 			return sqlite3_column_text(statement, index)[0 .. sqlite3_column_bytes(statement, index)].idup;
 		}
 		
-		const(void)[] getBlob(size_t index) {
-			return sqlite3_column_blob(statement, index)[0 .. sqlite3_column_bytes(statement, index)];
+		immutable(void)[] getBlob(size_t index) {
+			return sqlite3_column_blob(statement, index)[0 .. sqlite3_column_bytes(statement, index)].idup;
 		}
 		
 		string getColumnName(size_t index) {

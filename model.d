@@ -11,8 +11,25 @@ mixin template Model(string _tableName) {
 	static size_t[] memberToColumn; 
 	static size_t[] columnToMember;
 	
-	static void getNextFromQuery(Query q) {
-		q.advance();
+	static typeof(this) fromQuery(Query q) {
+		//To do: clearer message?
+		assert(q, "Attempt to retrive " ~ typeof(this).stringof ~ " without a valid query");
+		if(q.status == QueryStatus.notStarted)
+			{q.advance();}
+		assert(q.status == QueryStatus.hasData, "Attempt to retrieve data from a query with no valid data available");
+		size_t i = 0;
+		typeof(this) instance;
+		foreach(memberName; __traits(allMembers, typeof(this))) {
+			mixin("alias instance." ~ memberName ~ " member;");
+			static if(isInstanceDataMember!member) {
+				if(columnToMember[i] < size_t.max) {
+					auto ptr = &__traits(getMember, instance, memberName);
+					*ptr = q.get!(typeof(member))(memberToColumn[i]);
+				}
+				++i;
+			}
+		}
+		return instance;
 	}
 	
 	static void updateSchema(Database db) {
@@ -44,11 +61,20 @@ struct ModelRange(T) {
 	Query q;
 	
 	T front() {
-		
+		return T.fromQuery(q);
 	}
 	
 	T popFront() {
-		
+		T value = front;
+		if(q.status == QueryStatus.hasData)
+			{q.advance();}
+		return value;
+	}
+	
+	@property bool empty() {
+		if(q.status == QueryStatus.notStarted)
+			{q.advance();}
+		return q.status != QueryStatus.hasData;
 	}
 }
 
