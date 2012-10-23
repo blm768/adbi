@@ -12,8 +12,7 @@ mixin template Model(string _tableName) {
 	static size_t[] columnToMember;
 	
 	private:
-	static char[] columnNames;
-	static string valueBlanks;
+	static Query saveQuery;
 	
 	public:
 	@property size_t id() {
@@ -30,7 +29,7 @@ mixin template Model(string _tableName) {
 	}
 	
 	void save(Database db) {
-		Query q = db.query("INSERT INTO " ~ tableName ~ " (" ~ columnNames ~ ") VALUES (" ~ valueBlanks ~ ");");
+		saveQuery.reset();
 		size_t i = 1;
 		foreach(memberName; __traits(allMembers, typeof(this))) {
 			mixin("alias this." ~ memberName ~ " member;");
@@ -42,13 +41,15 @@ mixin template Model(string _tableName) {
 					if(memberToColumn[i - 1] < size_t.max) {
 						writeln(memberName);
 						//enum string colName = toColumnName!memberName;
-						q.bind(i, member);
+						saveQuery.bind(i, member);
 					}
+					++i;
 				}
-				++i;
 			}
 		}
-		assert(q.advance() == QueryStatus.finished);
+		assert(saveQuery.advance() == QueryStatus.finished);
+		//To do: remove?
+		saveQuery.reset();
 	}
 	
 	private:
@@ -79,6 +80,8 @@ mixin template Model(string _tableName) {
 	}
 	
 	static void updateSchema(Database db) {
+		char[] saveStatement = ("INSERT INTO " ~ tableName ~ " (").dup;
+		char[] colNames;
 		auto t = db.tables[tableName];
 		memberToColumn.length = 0;
 		columnToMember = uninitializedArray!(size_t[])(t.columnNames.length);
@@ -93,8 +96,12 @@ mixin template Model(string _tableName) {
 				if(col) {
 					memberToColumn ~= *col;
 					columnToMember[*col] = member.offsetof;
-					if(memberName != "_id_")
-						{columnNames ~= (toColumnName!memberName ~ ",");}
+					if(memberName != "_id_") {
+						if(colNames.length > 0) {
+							colNames ~= ",";
+						}
+						colNames ~= (toColumnName!memberName);
+					}
 				} else {
 					memberToColumn ~= size_t.max;
 					columnToMember [i] = size_t.max;
@@ -102,13 +109,13 @@ mixin template Model(string _tableName) {
 				++i;
 			}
 		}
+		saveStatement ~= colNames;
+		saveStatement ~= ") VALUES (";
 		if(i > 1) {
-			columnNames = columnNames[0 .. $ - 1];
-			valueBlanks = replicate("?,", i - 1)[0 .. $ - 1];
-		} else {
-			columnNames.length = 0;
-			valueBlanks.length = 0;
+			saveStatement ~= replicate("?,", i - 1)[0 .. $ - 1];
 		}
+		saveStatement ~= ");";
+		saveQuery = db.query(saveStatement);
 	}
 
 	//If only CTFE would kick in...
