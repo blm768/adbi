@@ -8,9 +8,53 @@ public import adbi.traits;
 
 mixin template Model(string _tableName) {
 	enum string tableName = _tableName;
-	static size_t[] memberToColumn; 
+	static size_t[] memberToColumn;
 	static size_t[] columnToMember;
 	
+	private:
+	static char[] columnNames;
+	static string valueBlanks;
+	
+	public:
+	@property size_t id() {
+		return _id_;
+	}
+	
+	@property bool inDatabase(Database db) {
+		//To do: verify that this works for all DBs.
+		if(id == 0)
+			{return false;}
+		auto q = db.query("SELECT * FROM " ~ tableName ~ " WHERE id = ?;");
+		q.bind(1, id);
+		return q.advance() == QueryStatus.hasData;
+	}
+	
+	void save(Database db) {
+		Query q = db.query("INSERT INTO " ~ tableName ~ " (" ~ columnNames ~ ") VALUES (" ~ valueBlanks ~ ");");
+		size_t i = 1;
+		foreach(memberName; __traits(allMembers, typeof(this))) {
+			mixin("alias this." ~ memberName ~ " member;");
+			static if(isInstanceDataMember!member) {
+				static if(memberName != "_id_") {
+					//Is this column in the database?
+					writeln(memberName);
+					writeln(i);
+					if(memberToColumn[i - 1] < size_t.max) {
+						writeln(memberName);
+						//enum string colName = toColumnName!memberName;
+						q.bind(i, member);
+					}
+				}
+				++i;
+			}
+		}
+		assert(q.advance() == QueryStatus.finished);
+	}
+	
+	private:
+	size_t _id_;
+	
+	public:
 	static typeof(this) fromQuery(Query q) {
 		//To do: clearer message?
 		assert(q, "Attempt to retrive " ~ typeof(this).stringof ~ " without a valid query");
@@ -25,6 +69,8 @@ mixin template Model(string _tableName) {
 				if(columnToMember[i] < size_t.max) {
 					auto ptr = &__traits(getMember, instance, memberName);
 					*ptr = q.get!(typeof(member))(memberToColumn[i]);
+				} else {
+					assert(false, "Field " ~ memberName ~ " not present in database");
 				}
 				++i;
 			}
@@ -43,16 +89,35 @@ mixin template Model(string _tableName) {
 			//Is this an instance member?
 			//To do: test; this might not always work.
 			static if(isInstanceDataMember!member) {
-				auto col = memberName in t.columnIndices;
+				auto col = toColumnName!memberName in t.columnIndices;
 				if(col) {
 					memberToColumn ~= *col;
 					columnToMember[*col] = member.offsetof;
+					if(memberName != "_id_")
+						{columnNames ~= (toColumnName!memberName ~ ",");}
 				} else {
 					memberToColumn ~= size_t.max;
 					columnToMember [i] = size_t.max;
 				}
 				++i;
 			}
+		}
+		if(i > 1) {
+			columnNames = columnNames[0 .. $ - 1];
+			valueBlanks = replicate("?,", i - 1)[0 .. $ - 1];
+		} else {
+			columnNames.length = 0;
+			valueBlanks.length = 0;
+		}
+	}
+
+	//If only CTFE would kick in...
+	//To do: how to handle members w/ only a leading underscore?
+	template toColumnName(string memberName) {
+		static if(memberName[0] == '_' && memberName[$ - 1] == '_') {
+			enum string toColumnName = memberName[1 .. $ - 1];
+		} else {
+			enum string toColumnName = memberName;
 		}
 	}
 }

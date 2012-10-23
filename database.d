@@ -64,6 +64,7 @@ interface Query {
 	@property QueryStatus status();
 	void reset();
 	@property size_t numColumns();
+	@property const(char)[] statement();
 	
 	void bind(size_t index, int value);
 	void bind(size_t index, long value);
@@ -94,8 +95,8 @@ interface Query {
 	int getInt(size_t index);
 	long getLong(size_t index);
 	double getDouble(size_t index);
-	const(char)[] getText(size_t index);
-	const(void)[] getBlob(size_t index);
+	string getText(size_t index);
+	immutable(void)[] getBlob(size_t index);
 	
 	string getColumnName(size_t index);
 }

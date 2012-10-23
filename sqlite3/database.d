@@ -24,9 +24,7 @@ class Sqlite3Database: Database {
 	}
 	
 	Query query(const(char)[] statement) {
-		auto q = new Sqlite3Query;
-		q.statement = compileStatement(statement);
-		return q;
+		return new Sqlite3Query(statement);
 	}
 	
 	void updateSchema() {
@@ -48,8 +46,13 @@ class Sqlite3Database: Database {
 	
 	//To do: file bug? (Just calling this Query gives an error.)
 	class Sqlite3Query: adbi.database.Query {
+		this(const(char)[] statement) {
+			_statement = statement;
+			_s = compileStatement(statement);
+		}
+		
 		QueryStatus advance() {
-			int qStatus = sqlite3_step(statement);
+			int qStatus = sqlite3_step(_s);
 			with(QueryStatus) switch(qStatus) {
 				//To do: handle busy case
 				case SQLITE_BUSY:
@@ -76,78 +79,83 @@ class Sqlite3Database: Database {
 		
 		//To do: unit tests to verify that status stays consistent
 		void reset() {
-			int status = sqlite3_reset(statement);
+			int status = sqlite3_reset(_s);
 			if(status)
 				{throw new Sqlite3Error(status, "Unable to reset query");}
 			_status = QueryStatus.notStarted;
 		}
 		
 		@property size_t numColumns() {
-			return cast(size_t)sqlite3_column_count(statement);
+			return cast(size_t)sqlite3_column_count(_s);
+		}
+		
+		@property const(char)[] statement() {
+			return _statement;
 		}
 		
 		void bind(size_t index, int value) {
-			int status = sqlite3_bind_int(statement, index, value);
+			int status = sqlite3_bind_int(_s, index, value);
 			if(status)
 				{throw new Sqlite3BindError(status, value);}
 		}
 		
 		void bind(size_t index, long value) {
-			int status = sqlite3_bind_int64(statement, index, value);
+			int status = sqlite3_bind_int64(_s, index, value);
 			if(status)
 				{throw new Sqlite3BindError(status, value);}
 		}
 		
 		void bind(size_t index, double value) {
-			int status = sqlite3_bind_double(statement, index, value);
+			int status = sqlite3_bind_double(_s, index, value);
 			if(status)
 				{throw new Sqlite3BindError(status, value);}
 		}
 		
 		void bind(size_t index, const(char)[] text) {
 			//To do: optimize.
-			int status = sqlite3_bind_text(statement, index, text.ptr, cast(int)text.length, SQLITE_TRANSIENT);
+			int status = sqlite3_bind_text(_s, index, text.ptr, cast(int)text.length, SQLITE_TRANSIENT);
 			if(status)
 				{throw new Sqlite3BindError(status, text);}
 		}
 		
 		void bind(size_t index, const(void)[] blob) {
-			int status = sqlite3_bind_blob(statement, index, blob.ptr, cast(int)blob.length, SQLITE_TRANSIENT);
+			int status = sqlite3_bind_blob(_s, index, blob.ptr, cast(int)blob.length, SQLITE_TRANSIENT);
 			if(status)
 				{throw new Sqlite3BindError(status, blob);}
 		}
 		
 		//To do: error checking?
 		int getInt(size_t index) {
-			return cast(long)sqlite3_column_int(statement, index);
+			return cast(long)sqlite3_column_int(_s, index);
 		}
 		
 		long getLong(size_t index) {
-			return cast(long)sqlite3_column_int64(statement, index);
+			return cast(long)sqlite3_column_int64(_s, index);
 		}
 		
 		double getDouble(size_t index) {
-			return sqlite3_column_double(statement, index);
+			return sqlite3_column_double(_s, index);
 		}
 		
 		string getText(size_t index) {
-			return sqlite3_column_text(statement, index)[0 .. sqlite3_column_bytes(statement, index)].idup;
+			return sqlite3_column_text(_s, index)[0 .. sqlite3_column_bytes(_s, index)].idup;
 		}
 		
 		immutable(void)[] getBlob(size_t index) {
-			return sqlite3_column_blob(statement, index)[0 .. sqlite3_column_bytes(statement, index)].idup;
+			return sqlite3_column_blob(_s, index)[0 .. sqlite3_column_bytes(_s, index)].idup;
 		}
 		
 		string getColumnName(size_t index) {
-			return sqlite3_column_name(statement, index).to!string;
+			return sqlite3_column_name(_s, index).to!string;
 		}
 	
 		~this() {
-			sqlite3_finalize(statement);
+			sqlite3_finalize(_s);
 		}
 		
 		private:
-		sqlite3_stmt* statement;
+		sqlite3_stmt* _s;
+		const(char)[] _statement;
 		QueryStatus _status;
 	}
 	
@@ -174,7 +182,7 @@ class Sqlite3Database: Database {
 		sqlite3_stmt* s;
 		int status = sqlite3_prepare_v2(connection, statement.ptr, statement.length, &s, null);
 		if(status) {
-			throw new Sqlite3Error(status, "Unable to compile statement");
+			throw new Sqlite3Error(status, cast(immutable)("Unable to compile statement: " ~ statement));
 		}
 		return s;
 	}
