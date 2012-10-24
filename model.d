@@ -5,6 +5,7 @@ import std.stdio;
 
 public import adbi.database;
 public import adbi.traits;
+public import core.exception;
 
 mixin template Model(string _tableName) {
 	enum string tableName = _tableName;
@@ -82,9 +83,14 @@ mixin template Model(string _tableName) {
 	static void updateSchema(Database db) {
 		char[] saveStatement = ("INSERT INTO " ~ tableName ~ " (").dup;
 		char[] colNames;
-		auto t = db.tables[tableName];
+		Database.Table t;
+		try {
+			t = db.tables[tableName];
+		} catch(RangeError e) {
+			throw new Error("Table " ~ tableName ~ " not found");
+		}
 		memberToColumn.length = 0;
-		columnToMember = uninitializedArray!(size_t[])(t.columnNames.length);
+		columnToMember = replicate([size_t.max], t.columnNames.length);
 		size_t i = 0;
 		enum typeof(this) instance = typeof(this).init;
 		foreach(memberName; __traits(allMembers, typeof(this))) {
@@ -95,6 +101,7 @@ mixin template Model(string _tableName) {
 				auto col = toColumnName!memberName in t.columnIndices;
 				if(col) {
 					memberToColumn ~= *col;
+					writeln(*col);
 					columnToMember[*col] = member.offsetof;
 					if(memberName != "_id_") {
 						if(colNames.length > 0) {
@@ -103,8 +110,7 @@ mixin template Model(string _tableName) {
 						colNames ~= (toColumnName!memberName);
 					}
 				} else {
-					memberToColumn ~= size_t.max;
-					columnToMember [i] = size_t.max;
+					throw new Error("Column " ~ toColumnName!memberName ~ " does not exist in table " ~ tableName ~ ".");
 				}
 				++i;
 			}
@@ -127,6 +133,13 @@ mixin template Model(string _tableName) {
 			enum string toColumnName = memberName;
 		}
 	}
+}
+
+mixin template reference(string name, string foreignTableName, T) {
+	mixin("size_t " ~ name ~ "_id;");
+	mixin("@property T " ~ name ~ q{(){
+		return T.init;
+	}});
 }
 
 struct ModelRange(T) {
