@@ -11,46 +11,63 @@ mixin template Model(string _tableName) {
 	enum string tableName = _tableName;
 	static size_t[] memberToColumn;
 	static size_t[] columnToMember;
+	static @property Database database() {
+		return saveQuery.database;
+	}
 	
 	private:
 	static Query saveQuery;
+	static Query updateQuery;
 	
 	public:
 	@property size_t id() {
 		return _id_;
 	}
 	
-	@property bool inDatabase(Database db) {
+	@property bool inDatabase() {
 		//To do: verify that this works for all DBs.
 		if(id == 0)
 			{return false;}
-		auto q = db.query("SELECT * FROM " ~ tableName ~ " WHERE id = ?;");
+		//To do: don't constantly recreate this query.
+		auto q = database.query("SELECT * FROM " ~ tableName ~ " WHERE id = ?;");
 		q.bind(1, id);
 		return q.advance() == QueryStatus.hasData;
 	}
 	
-	void save(Database db) {
-		saveQuery.reset();
-		size_t i = 1;
-		foreach(memberName; __traits(allMembers, typeof(this))) {
-			mixin("alias this." ~ memberName ~ " member;");
-			static if(isInstanceDataMember!member) {
-				static if(memberName != "_id_") {
-					//Is this column in the database?
-					writeln(memberName);
-					writeln(i);
-					if(memberToColumn[i - 1] < size_t.max) {
-						writeln(memberName);
-						//enum string colName = toColumnName!memberName;
-						saveQuery.bind(i, member);
+	void save() {
+		if(inDatabase) {
+			//To do: update columns.
+			updateQuery.reset();
+			size_t i = 1;
+			foreach(memberName; __traits(allMembers, typeof(this))) {
+				mixin("alias this." ~ memberName ~ " member;");
+				static if(isInstanceDataMember!member) {
+					static if(memberName != "_id_") {
+						updateQuery.bind(i, member);
+						++i;
 					}
-					++i;
 				}
 			}
+			updateQuery.bind(i, id);
+			assert(updateQuery.advance() == QueryStatus.finished);
+			//To do: remove?
+			updateQuery.reset();
+		} else {
+			saveQuery.reset();
+			size_t i = 1;
+			foreach(memberName; __traits(allMembers, typeof(this))) {
+				mixin("alias this." ~ memberName ~ " member;");
+				static if(isInstanceDataMember!member) {
+					static if(memberName != "_id_") {
+						saveQuery.bind(i, member);
+						++i;
+					}
+				}
+			}
+			assert(saveQuery.advance() == QueryStatus.finished);
+			//To do: remove?
+			saveQuery.reset();
 		}
-		assert(saveQuery.advance() == QueryStatus.finished);
-		//To do: remove?
-		saveQuery.reset();
 	}
 	
 	private:
@@ -81,8 +98,9 @@ mixin template Model(string _tableName) {
 	}
 	
 	static void updateSchema(Database db) {
-		char[] saveStatement = ("INSERT INTO " ~ tableName ~ " (").dup;
-		char[] colNames;
+		char[] saveStatement = "INSERT INTO ".dup ~ tableName ~ " (";
+		char[] updateStatement = "UPDATE ".dup ~ tableName ~ " SET ";
+		string[] colNames;
 		Database.Table t;
 		try {
 			t = db.tables[tableName];
@@ -101,13 +119,9 @@ mixin template Model(string _tableName) {
 				auto col = toColumnName!memberName in t.columnIndices;
 				if(col) {
 					memberToColumn ~= *col;
-					writeln(*col);
 					columnToMember[*col] = member.offsetof;
 					if(memberName != "_id_") {
-						if(colNames.length > 0) {
-							colNames ~= ",";
-						}
-						colNames ~= (toColumnName!memberName);
+						colNames ~= toColumnName!memberName;
 					}
 				} else {
 					throw new Error("Column " ~ toColumnName!memberName ~ " does not exist in table " ~ tableName ~ ".");
@@ -115,13 +129,16 @@ mixin template Model(string _tableName) {
 				++i;
 			}
 		}
-		saveStatement ~= colNames;
+		saveStatement ~= colNames.join(",");
 		saveStatement ~= ") VALUES (";
 		if(i > 1) {
 			saveStatement ~= replicate("?,", i - 1)[0 .. $ - 1];
 		}
 		saveStatement ~= ");";
+		updateStatement ~= colNames.join("=?, ");
+		updateStatement ~= "=? WHERE id=?;";
 		saveQuery = db.query(saveStatement);
+		updateQuery = db.query(updateStatement);
 	}
 
 	//If only CTFE would kick in...

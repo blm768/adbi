@@ -65,6 +65,7 @@ interface Query {
 	void reset();
 	@property size_t numColumns();
 	@property const(char)[] statement();
+	@property Database database();
 	
 	void bind(size_t index, int value);
 	void bind(size_t index, long value);

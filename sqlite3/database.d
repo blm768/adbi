@@ -93,6 +93,10 @@ class Sqlite3Database: Database {
 			return _statement;
 		}
 		
+		@property Database database() {
+			return this.outer;
+		}
+		
 		void bind(size_t index, int value) {
 			int status = sqlite3_bind_int(_s, index, value);
 			if(status)
