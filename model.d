@@ -153,10 +153,16 @@ mixin template Model(string _tableName) {
 }
 
 mixin template reference(string name, string foreignTableName, T) {
+	static Query referenceQuery;
 	mixin("size_t " ~ name ~ "_id;");
-	mixin("@property T " ~ name ~ q{(){
-		return T.init;
-	}});
+	mixin("@property T " ~ name ~ `(){
+		if(!referenceQuery) {
+			referenceQuery = database.query("SELECT * FROM " ~ foreignTableName ~ " WHERE id = ?;");
+		}
+		referenceQuery.reset();
+		referenceQuery.bind(1, ` ~ name ~ `_id);
+		return T.fromQuery(referenceQuery);
+	}`);
 }
 
 struct ModelRange(T) {
