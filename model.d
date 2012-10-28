@@ -1,7 +1,7 @@
 module adbi.model;
 
 public import std.array;
-import std.stdio;
+import std.string;
 
 public import adbi.database;
 public import adbi.traits;
@@ -29,12 +29,14 @@ mixin template Model(string _tableName) {
 		if(id == 0)
 			{return false;}
 		//To do: don't constantly recreate this query.
-		auto q = database.query("SELECT * FROM " ~ tableName ~ " WHERE id = ?;");
+		auto q = database.query("SELECT * FROM " ~ tableName ~ " WHERE id = ? LIMIT 1;");
 		q.bind(1, id);
 		return q.advance() == QueryStatus.hasData;
 	}
 	
+	//To do: versions that are told if the object exists in the database?
 	void save() {
+		//To do: semantics of saving an object that was removed from the database?
 		if(inDatabase) {
 			//To do: update columns.
 			updateQuery.reset();
@@ -67,6 +69,7 @@ mixin template Model(string _tableName) {
 			assert(saveQuery.advance() == QueryStatus.finished);
 			//To do: remove?
 			saveQuery.reset();
+			_id_ = database.lastInsertedRowId;
 		}
 	}
 	
@@ -74,7 +77,7 @@ mixin template Model(string _tableName) {
 	size_t _id_;
 	
 	public:
-	static typeof(this) fromQuery(Query q) {
+	static typeof(this) fromQuery(Query q, size_t startIndex = 0) {
 		//To do: clearer message?
 		assert(q, "Attempt to retrive " ~ typeof(this).stringof ~ " without a valid query");
 		if(q.status == QueryStatus.notStarted)
@@ -87,7 +90,7 @@ mixin template Model(string _tableName) {
 			static if(isInstanceDataMember!member) {
 				if(columnToMember[i] < size_t.max) {
 					auto ptr = &__traits(getMember, instance, memberName);
-					*ptr = q.get!(typeof(member))(memberToColumn[i]);
+					*ptr = q.get!(typeof(member))(memberToColumn[i] + startIndex);
 				} else {
 					assert(false, "Field " ~ memberName ~ " not present in database");
 				}
@@ -157,12 +160,41 @@ mixin template reference(string name, string foreignTableName, T) {
 	mixin("size_t " ~ name ~ "_id;");
 	mixin("@property T " ~ name ~ `(){
 		if(!referenceQuery) {
-			referenceQuery = database.query("SELECT * FROM " ~ foreignTableName ~ " WHERE id = ?;");
+			referenceQuery = database.query("SELECT * FROM " ~ foreignTableName ~ " WHERE id = ? LIMIT 1;");
 		}
 		referenceQuery.reset();
 		referenceQuery.bind(1, ` ~ name ~ `_id);
 		return T.fromQuery(referenceQuery);
 	}`);
+}
+
+struct Join(T ...) {
+	mixin joinMembers!T;
+	
+	static Join fromQuery(Query q) {
+		size_t index = 0;
+		typeof(this) result;
+		foreach(memberName; __traits(allMembers, Join)) {
+			mixin("alias result." ~ memberName ~ " member;");
+			static if(isInstanceDataMember!member) {
+				auto ptr = &__traits(getMember, result, memberName);
+				*ptr = typeof(*ptr).fromQuery(q, index);
+				index += typeof(member).memberToColumn.length;
+			}
+		}
+		return result;
+	}
+}
+
+private template joinMembers(T ...) {
+	static if(T.length > 0) {
+		static if(T[0].stringof.length > 1) {
+			mixin("T[0] " ~ toLower(T[0].stringof[0 .. 1]) ~ T[0].stringof[1 .. $] ~ ";");
+		} else {
+			mixin("T[0] " ~ toLower(T[0].stringof) ~ ";");
+		}
+		mixin joinMembers!(T[1 .. $]);
+	}
 }
 
 struct ModelRange(T) {

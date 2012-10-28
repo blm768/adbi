@@ -23,8 +23,24 @@ class Sqlite3Database: Database {
 		super();
 	}
 	
+	override @property size_t lastInsertedRowId() {
+		return cast(size_t)sqlite3_last_insert_rowid(connection);
+	}
+		
 	Query query(const(char)[] statement) {
 		return new Sqlite3Query(statement);
+	}
+	
+	void startTransaction() {
+		assert(false);
+	}
+	
+	void commit() {
+		assert(false);
+	}
+	
+	void rollBack() {
+		assert(false);
 	}
 	
 	void updateSchema() {
@@ -97,6 +113,7 @@ class Sqlite3Database: Database {
 			return this.outer;
 		}
 		
+		//To do: change indices to 0-based?
 		void bind(size_t index, int value) {
 			int status = sqlite3_bind_int(_s, index, value);
 			if(status)

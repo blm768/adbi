@@ -17,6 +17,27 @@ abstract class Database {
 	Returns a query object for the provided statement
 	+/
 	Query query(const(char)[] statement);
+	
+	/++
+	Starts a transaction
+	+/
+	void startTransaction();
+	
+	/++
+	Commits the current transaction
+	+/
+	void commit();
+	
+	/++
+	Rolls back the current transaction
+	+/
+	void rollBack();
+		
+	/++
+	Returns the ID of the last row to be inserted
+	+/
+	@property size_t lastInsertedRowId();
+	
 	/++
 	A hash table of all tables in the database
 	Should never be modified by the user
@@ -42,6 +63,7 @@ abstract class Database {
 		@property const(char)[] name() const {
 			return _name;
 		}
+		
 		const(char)[][] columnNames;
 		size_t[string] columnIndices;
 		
