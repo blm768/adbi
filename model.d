@@ -7,10 +7,17 @@ public import adbi.database;
 public import adbi.traits;
 public import core.exception;
 
+/++
+Mixin template that makes a struct act as a model
++/
 mixin template Model(string _tableName) {
 	enum string tableName = _tableName;
 	static size_t[] memberToColumn;
 	static size_t[] columnToMember;
+	
+	/++
+	Returns the database with which this model is associated
+	+/
 	static @property Database database() {
 		return saveQuery.database;
 	}
@@ -20,10 +27,16 @@ mixin template Model(string _tableName) {
 	static Query updateQuery;
 	
 	public:
+	/++
+	Returns the record's ID (corresponding to the primary key)
+	+/
 	@property size_t id() {
 		return _id_;
 	}
 	
+	/++
+	Returns true if the record is stored in the database, false otherwise
+	+/
 	@property bool inDatabase() {
 		//To do: verify that this works for all DBs.
 		if(id == 0)
@@ -35,6 +48,11 @@ mixin template Model(string _tableName) {
 	}
 	
 	//To do: versions that are told if the object exists in the database?
+	/++
+	Saves the record to the database.
+	
+	If the record already exists in the database, the corresponding row will be updated.
+	+/
 	void save() {
 		//To do: semantics of saving an object that was removed from the database?
 		if(inDatabase) {
@@ -77,6 +95,9 @@ mixin template Model(string _tableName) {
 	size_t _id_;
 	
 	public:
+	/++
+	Creates an instance of the model from the query object's current result
+	+/
 	static typeof(this) fromQuery(Query q, size_t startIndex = 0) {
 		//To do: clearer message?
 		assert(q, "Attempt to retrive " ~ typeof(this).stringof ~ " without a valid query");
@@ -100,6 +121,11 @@ mixin template Model(string _tableName) {
 		return instance;
 	}
 	
+	/++
+	Associates this model with a database, creating internal structures to accelerate data retrieval
+	
+	This function must be called before the model can be used for any queries.
+	+/
 	static void updateSchema(Database db) {
 		char[] saveStatement = "INSERT INTO ".dup ~ tableName ~ " (";
 		char[] updateStatement = "UPDATE ".dup ~ tableName ~ " SET ";
@@ -155,6 +181,9 @@ mixin template Model(string _tableName) {
 	}
 }
 
+/++
+When mixed into a model, this creates a relational link to another model using a foreign key
++/
 mixin template reference(string name, string foreignTableName, T) {
 	static Query referenceQuery;
 	mixin("size_t " ~ name ~ "_id;");
@@ -168,6 +197,9 @@ mixin template reference(string name, string foreignTableName, T) {
 	}`);
 }
 
+/++
+Represents a single result from a join operation
++/
 struct Join(T ...) {
 	mixin joinMembers!T;
 	
@@ -197,13 +229,18 @@ private template joinMembers(T ...) {
 	}
 }
 
+/++
+Represents a range of models from a query
++/
 struct ModelRange(T) {
 	Query q;
 	
+	///
 	T front() {
 		return T.fromQuery(q);
 	}
 	
+	///Returns the front and advances the query
 	T popFront() {
 		T value = front;
 		if(q.status == QueryStatus.hasData)
@@ -211,6 +248,7 @@ struct ModelRange(T) {
 		return value;
 	}
 	
+	///
 	@property bool empty() {
 		if(q.status == QueryStatus.notStarted)
 			{q.advance();}
