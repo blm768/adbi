@@ -7,8 +7,6 @@ import std.variant;
 import std.string;
 import std.traits;
 
-import std.stdio;
-
 public import adbi.database;
 
 pragma(lib, "sqlite3");
@@ -27,23 +25,23 @@ class Sqlite3Database: Database {
 		return cast(size_t)sqlite3_last_insert_rowid(connection);
 	}
 		
-	Query query(const(char)[] statement) {
+	override Query query(const(char)[] statement) {
 		return new Sqlite3Query(statement);
 	}
 	
-	void startTransaction() {
+	override void startTransaction() {
 		assert(false);
 	}
 	
-	void commit() {
+	override void commit() {
 		assert(false);
 	}
 	
-	void rollBack() {
+	override void rollBack() {
 		assert(false);
 	}
 	
-	void updateSchema() {
+	override void updateSchema() {
 		Query q = query("SELECT name FROM sqlite_master WHERE type='table';");
 		tables.clear();
 		while(q.advance() == QueryStatus.hasData) {
@@ -83,7 +81,6 @@ class Sqlite3Database: Database {
 				default:
 					_status = finished;
 					throw new Sqlite3Error(qStatus, "Error while evaluating statement");
-					break;
 			}
 			assert(_status != QueryStatus.notStarted);
 			return _status;
@@ -115,59 +112,59 @@ class Sqlite3Database: Database {
 		
 		//To do: change indices to 0-based?
 		void bind(size_t index, int value) {
-			int status = sqlite3_bind_int(_s, index, value);
+			int status = sqlite3_bind_int(_s, cast(int)index, value);
 			if(status)
 				{throw new Sqlite3BindError(status, value);}
 		}
 		
 		void bind(size_t index, long value) {
-			int status = sqlite3_bind_int64(_s, index, value);
+			int status = sqlite3_bind_int64(_s, cast(int)index, value);
 			if(status)
 				{throw new Sqlite3BindError(status, value);}
 		}
 		
 		void bind(size_t index, double value) {
-			int status = sqlite3_bind_double(_s, index, value);
+			int status = sqlite3_bind_double(_s, cast(int)index, value);
 			if(status)
 				{throw new Sqlite3BindError(status, value);}
 		}
 		
 		void bind(size_t index, const(char)[] text) {
 			//To do: optimize.
-			int status = sqlite3_bind_text(_s, index, text.ptr, cast(int)text.length, SQLITE_TRANSIENT);
+			int status = sqlite3_bind_text(_s, cast(int)index, text.ptr, cast(int)text.length, SQLITE_TRANSIENT);
 			if(status)
 				{throw new Sqlite3BindError(status, text);}
 		}
 		
 		void bind(size_t index, const(void)[] blob) {
-			int status = sqlite3_bind_blob(_s, index, blob.ptr, cast(int)blob.length, SQLITE_TRANSIENT);
+			int status = sqlite3_bind_blob(_s, cast(int)index, blob.ptr, cast(int)blob.length, SQLITE_TRANSIENT);
 			if(status)
 				{throw new Sqlite3BindError(status, blob);}
 		}
 		
 		//To do: error checking?
 		int getInt(size_t index) {
-			return cast(long)sqlite3_column_int(_s, index);
+			return cast(long)sqlite3_column_int(_s, cast(int)index);
 		}
 		
 		long getLong(size_t index) {
-			return cast(long)sqlite3_column_int64(_s, index);
+			return cast(long)sqlite3_column_int64(_s, cast(int)index);
 		}
 		
 		double getDouble(size_t index) {
-			return sqlite3_column_double(_s, index);
+			return sqlite3_column_double(_s, cast(int)index);
 		}
 		
 		string getText(size_t index) {
-			return sqlite3_column_text(_s, index)[0 .. sqlite3_column_bytes(_s, index)].idup;
+			return sqlite3_column_text(_s, cast(int)index)[0 .. sqlite3_column_bytes(_s, cast(int)index)].idup;
 		}
 		
 		immutable(void)[] getBlob(size_t index) {
-			return sqlite3_column_blob(_s, index)[0 .. sqlite3_column_bytes(_s, index)].idup;
+			return sqlite3_column_blob(_s, cast(int)index)[0 .. sqlite3_column_bytes(_s, cast(int)index)].idup;
 		}
 		
 		string getColumnName(size_t index) {
-			return sqlite3_column_name(_s, index).to!string;
+			return sqlite3_column_name(_s, cast(int)index).to!string;
 		}
 	
 		~this() {
@@ -201,7 +198,7 @@ class Sqlite3Database: Database {
 	protected:
 	sqlite3_stmt* compileStatement(const(char)[] statement) {
 		sqlite3_stmt* s;
-		int status = sqlite3_prepare_v2(connection, statement.ptr, statement.length, &s, null);
+		int status = sqlite3_prepare_v2(connection, statement.ptr, cast(int)statement.length, &s, null);
 		if(status) {
 			throw new Sqlite3Error(status, cast(immutable)("Unable to compile statement: " ~ statement));
 		}

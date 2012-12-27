@@ -22,6 +22,10 @@ mixin template Model(string _tableName) {
 		return saveQuery.database;
 	}
 	
+	static ModelQuery!(typeof(this)) query(const(char)[] statement) {
+		return ModelQuery!(typeof(this))(database.query(statement));
+	}
+	
 	private:
 	static Query saveQuery;
 	static Query updateQuery;
@@ -236,7 +240,7 @@ struct ModelRange(T) {
 	Query q;
 	
 	///
-	T front() {
+	@property T front() {
 		return T.fromQuery(q);
 	}
 	
@@ -255,4 +259,18 @@ struct ModelRange(T) {
 		return q.status != QueryStatus.hasData;
 	}
 }
+
+/++
+Wraps a Query to work like a ModelRange
++/
+struct ModelQuery(T) {
+	Query query;
+	
+	@property ModelRange!T modelRange() {
+		return ModelRange!T(query);
+	}
+	
+	alias modelRange this;
+}
+
 
