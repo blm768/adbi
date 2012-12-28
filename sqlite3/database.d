@@ -3,7 +3,6 @@ module adbi.sqlite3.database;
 import etc.c.sqlite3;
 import std.array;
 import std.conv;
-import std.variant;
 import std.string;
 import std.traits;
 
@@ -13,7 +12,7 @@ pragma(lib, "sqlite3");
 
 class Sqlite3Database: Database {
 	this(const(char)[] filename) {
-		int status = sqlite3_open(filename.toStringz, &connection);
+		int status = sqlite3_open(toStringz(filename), &connection);
 		if(status) {
 			//The cast is hacky, but it seems to be needed for now. Ick.
 			throw new Sqlite3Error(status, "Unable to open database " ~ cast(immutable)filename);
@@ -164,7 +163,7 @@ class Sqlite3Database: Database {
 		}
 		
 		string getColumnName(size_t index) {
-			return sqlite3_column_name(_s, cast(int)index).to!string;
+			return to!string(sqlite3_column_name(_s, cast(int)index));
 		}
 	
 		~this() {
@@ -215,6 +214,6 @@ class Sqlite3Error: Error {
 
 class Sqlite3BindError: Sqlite3Error {
 	this(T)(int code, T value) {
-		super(code, `Unable to bind value "` ~ value.to!string);
+		super(code, `Unable to bind value "` ~ to!string(value));
 	}
 }

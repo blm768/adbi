@@ -261,16 +261,24 @@ struct ModelRange(T) {
 }
 
 /++
-Wraps a Query to work like a ModelRange
+Wraps a Query to include model-specific utilities
 +/
 struct ModelQuery(T) {
 	Query query;
 	
-	@property ModelRange!T modelRange() {
+	alias query this;
+	
+	@property bool empty() {
+		return results.empty;
+	}
+	
+	@property ModelRange!T results() {
 		return ModelRange!T(query);
 	}
 	
-	alias modelRange this;
+	@property T first() {
+		return results.front;
+	}
 }
 
 
