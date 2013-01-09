@@ -7,25 +7,47 @@ import std.string;
 import std.traits;
 
 import adbi.database;
+import adbi.model;
 
+/++
+Represents the contents of a query in an abstract form that can be converted to an SQL statement
++/
 struct QueryBuilder {
+	class InvalidQueryError: Error { this(string msg) { super(msg); } }
+	/++
+	The operation a query will perform (i.e. SELECT)
+	+/
 	enum Operation {
 		select,
 		update,
 		del,
 	}
 	
+	///
 	Operation operation;
-	const(char)[][] values;
-	const(char)[][] whereClauses;
+	///The names of the columns/expressions to be returned by the query
+	const(char)[][] columns;
+	///The conditions appearing in the WHERE clause
+	const(char)[][] whereConditions;
+	///The source table or expression
 	const(char)[] fromClause;
 	
-	const(char)[] build() {
+	///Creates a Query from this object
+	@property Query query(Database db) {
+		return db.query(statement);
+	}
+	
+	///Creates an SQL statement from this object
+	@property const(char)[] statement() {
 		const(char)[] base;
 		switch(operation) {
 			case Operation.select:
-				base = "SELECT (%s) FROM %s".format(values.save.join(","), fromClause);
-				if(whereClauses.length > 0) {
+				if(fromClause.length == 0) {
+					throw new InvalidQueryError("No fromClause provided");
+				}
+				//To do: remove saves?
+				base = "SELECT (%s) FROM %s".format(columns.save.join(","), fromClause);
+				if(whereConditions.length > 0) {
 					base ~= " WHERE ";
 					base ~= whereClause;
 				}
@@ -35,13 +57,28 @@ struct QueryBuilder {
 		}
 	}
 	
+	///Returns a QueryBuilder that is a copy of this one with an added whereCondition
 	QueryBuilder where(const(char)[] condition) {
 		auto result = this;
-		result.whereClauses ~= condition;
+		result.whereConditions ~= condition;
 		return result;
 	}
 	
 	@property const(char)[] whereClause() {
-		return whereClauses.save.map!(s => "(%s)".format(s)).join(" AND ");
+		return whereConditions.save.map!(s => "(%s)".format(s)).join(" AND ");
 	}
+}
+
+
+//To do: move to model.d?
+/++
+Associates a QueryBuilder with a Model
++/
+struct ModelQueryBuilder(Model) {
+	@property ModelQuery!Model query() {
+		return Model.query(statement);
+	}
+	
+	QueryBuilder builder;
+	alias builder this;
 }

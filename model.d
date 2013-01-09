@@ -13,6 +13,7 @@ Mixin template that makes a struct act as a model
 +/
 mixin template Model(string _tableName) {
 	enum string tableName = _tableName;
+	static string[] columnNames;
 	static size_t[] memberToColumn;
 	static size_t[] columnToMember;
 	
@@ -39,10 +40,10 @@ mixin template Model(string _tableName) {
 		return _id_;
 	}
 	
-	static @property QueryBuilder all() {
-		QueryBuilder q;
-		//To do: specify all values.
-		q.values = ["*"];
+	static @property ModelQueryBuilder!(typeof(this)) all() {
+		ModelQueryBuilder!(typeof(this)) q;
+		//To do: file bug report? (cast seems like it shouldn't be needed)
+		q.columns = cast(const(char)[][])columnNames;
 		//To do: escape?
 		q.fromClause = tableName;
 		return q;
@@ -152,7 +153,7 @@ mixin template Model(string _tableName) {
 	static void updateSchema(Database db) {
 		char[] saveStatement = "INSERT INTO ".dup ~ tableName ~ " (";
 		char[] updateStatement = "UPDATE ".dup ~ tableName ~ " SET ";
-		string[] colNames;
+		columnNames = [];
 		Database.Table t;
 		try {
 			t = db.tables[tableName];
@@ -173,7 +174,7 @@ mixin template Model(string _tableName) {
 					memberToColumn ~= *col;
 					columnToMember[*col] = member.offsetof;
 					if(memberName != "_id_") {
-						colNames ~= toColumnName!memberName;
+						columnNames ~= toColumnName!memberName;
 					}
 				} else {
 					throw new Error("Column " ~ toColumnName!memberName ~ " does not exist in table " ~ tableName ~ ".");
@@ -181,13 +182,13 @@ mixin template Model(string _tableName) {
 				++i;
 			}
 		}
-		saveStatement ~= colNames.join(",");
+		saveStatement ~= columnNames.join(",");
 		saveStatement ~= ") VALUES (";
 		if(i > 1) {
 			saveStatement ~= replicate("?,", i - 1)[0 .. $ - 1];
 		}
 		saveStatement ~= ");";
-		updateStatement ~= colNames.join("=?, ");
+		updateStatement ~= columnNames.join("=?, ");
 		updateStatement ~= "=? WHERE id=?;";
 		saveQuery = db.query(saveStatement);
 		updateQuery = db.query(updateStatement);
