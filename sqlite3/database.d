@@ -44,7 +44,7 @@ class Sqlite3Database: Database {
 		Query q = query("SELECT name FROM sqlite_master WHERE type='table';");
 		tables.clear();
 		while(q.advance() == QueryStatus.hasData) {
-			const(char)[] text = q.getText(0);
+			const(char)[] text = q.get!string(0);
 			tables[text] = new Sqlite3Table(text);
 		}
 	}
@@ -110,33 +110,33 @@ class Sqlite3Database: Database {
 		}
 		
 		//To do: change indices to 0-based?
-		void bind(size_t index, int value) {
-			int status = sqlite3_bind_int(_s, cast(int)index, value);
+		void bindAt(size_t index, int value) {
+			int status = sqlite3_bind_int(_s, cast(int)index + 1, value);
 			if(status)
 				{throw new Sqlite3BindError(status, value);}
 		}
 		
-		void bind(size_t index, long value) {
-			int status = sqlite3_bind_int64(_s, cast(int)index, value);
+		void bindAt(size_t index, long value) {
+			int status = sqlite3_bind_int64(_s, cast(int)index + 1, value);
 			if(status)
 				{throw new Sqlite3BindError(status, value);}
 		}
 		
-		void bind(size_t index, double value) {
-			int status = sqlite3_bind_double(_s, cast(int)index, value);
+		void bindAt(size_t index, double value) {
+			int status = sqlite3_bind_double(_s, cast(int)index + 1, value);
 			if(status)
 				{throw new Sqlite3BindError(status, value);}
 		}
 		
-		void bind(size_t index, const(char)[] text) {
+		void bindAt(size_t index, const(char)[] text) {
 			//To do: optimize.
-			int status = sqlite3_bind_text(_s, cast(int)index, text.ptr, cast(int)text.length, SQLITE_TRANSIENT);
+			int status = sqlite3_bind_text(_s, cast(int)index + 1, text.ptr, cast(int)text.length, SQLITE_TRANSIENT);
 			if(status)
 				{throw new Sqlite3BindError(status, text);}
 		}
 		
-		void bind(size_t index, const(void)[] blob) {
-			int status = sqlite3_bind_blob(_s, cast(int)index, blob.ptr, cast(int)blob.length, SQLITE_TRANSIENT);
+		void bindAt(size_t index, const(void)[] blob) {
+			int status = sqlite3_bind_blob(_s, cast(int)index + 1, blob.ptr, cast(int)blob.length, SQLITE_TRANSIENT);
 			if(status)
 				{throw new Sqlite3BindError(status, blob);}
 		}
@@ -209,7 +209,7 @@ class Sqlite3Database: Database {
 }
 
 class Sqlite3Error: Error {
-	this(int code, string msg) {super(msg ~ " (Sqlite3 error " ~ to!string(code) ~ ")");}
+	this(int code, string msg) {super(msg ~ " (SQLite3 error " ~ to!string(code) ~ ")");}
 }
 
 class Sqlite3BindError: Sqlite3Error {

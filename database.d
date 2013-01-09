@@ -89,11 +89,17 @@ interface Query {
 	@property const(char)[] statement();
 	@property Database database();
 	
-	void bind(size_t index, int value);
-	void bind(size_t index, long value);
-	void bind(size_t index, double value);
-	void bind(size_t index, const(char)[] text);
-	void bind(size_t index, const(void)[] blob);
+	void bindAt(size_t index, int value);
+	void bindAt(size_t index, long value);
+	void bindAt(size_t index, double value);
+	void bindAt(size_t index, const(char)[] text);
+	void bindAt(size_t index, const(void)[] blob);
+	
+	void bind(T...)(T args) {
+		foreach(i, value; args) {
+			bindAt(i, value);
+		}
+	}
 	
 	template get(T: int) {
 		alias getInt get;

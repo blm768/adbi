@@ -1,11 +1,12 @@
 module adbi.model;
 
+public import core.exception;
 public import std.array;
 import std.string;
 
 public import adbi.database;
 public import adbi.traits;
-public import core.exception;
+public import adbi.querybuilder;
 
 /++
 Mixin template that makes a struct act as a model
@@ -38,6 +39,15 @@ mixin template Model(string _tableName) {
 		return _id_;
 	}
 	
+	static @property QueryBuilder all() {
+		QueryBuilder q;
+		//To do: specify all values.
+		q.values = ["*"];
+		//To do: escape?
+		q.fromClause = tableName;
+		return q;
+	}
+	
 	/++
 	Returns true if the record is stored in the database, false otherwise
 	+/
@@ -47,7 +57,7 @@ mixin template Model(string _tableName) {
 			{return false;}
 		//To do: don't constantly recreate this query.
 		auto q = database.query("SELECT * FROM " ~ tableName ~ " WHERE id = ? LIMIT 1;");
-		q.bind(1, id);
+		q.bind(id);
 		return q.advance() == QueryStatus.hasData;
 	}
 	
@@ -62,28 +72,28 @@ mixin template Model(string _tableName) {
 		if(inDatabase) {
 			//To do: update columns.
 			updateQuery.reset();
-			size_t i = 1;
+			size_t i = 0;
 			foreach(memberName; __traits(allMembers, typeof(this))) {
 				mixin("alias this." ~ memberName ~ " member;");
 				static if(isInstanceDataMember!member) {
 					static if(memberName != "_id_") {
-						updateQuery.bind(i, member);
+						updateQuery.bindAt(i, member);
 						++i;
 					}
 				}
 			}
-			updateQuery.bind(i, id);
+			updateQuery.bindAt(i, id);
 			assert(updateQuery.advance() == QueryStatus.finished);
 			//To do: remove?
 			updateQuery.reset();
 		} else {
 			saveQuery.reset();
-			size_t i = 1;
+			size_t i = 0;
 			foreach(memberName; __traits(allMembers, typeof(this))) {
 				mixin("alias this." ~ memberName ~ " member;");
 				static if(isInstanceDataMember!member) {
 					static if(memberName != "_id_") {
-						saveQuery.bind(i, member);
+						saveQuery.bindAt(i, member);
 						++i;
 					}
 				}
@@ -92,6 +102,15 @@ mixin template Model(string _tableName) {
 			//To do: remove?
 			saveQuery.reset();
 			_id_ = database.lastInsertedRowId;
+		}
+	}
+	
+	//To do: semantics of deleting an object that's not in the database?
+	void destroy() {
+		if(id > 0) {
+			//auto q = 
+		} else {
+			throw new Error("Attempt to delete object that was never saved");
 		}
 	}
 	
@@ -196,7 +215,7 @@ mixin template reference(string name, string foreignTableName, T) {
 			referenceQuery = database.query("SELECT * FROM " ~ foreignTableName ~ " WHERE id = ? LIMIT 1;");
 		}
 		referenceQuery.reset();
-		referenceQuery.bind(1, ` ~ name ~ `_id);
+		referenceQuery.bind(` ~ name ~ `_id);
 		return T.fromQuery(referenceQuery);
 	}`);
 }
