@@ -14,8 +14,7 @@ class Sqlite3Database: Database {
 	this(const(char)[] filename) {
 		int status = sqlite3_open(toStringz(filename), &connection);
 		if(status) {
-			//The cast is hacky, but it seems to be needed for now. Ick.
-			throw new Sqlite3Error(status, "Unable to open database " ~ cast(immutable)filename);
+			throw new Sqlite3Error(status, "Unable to open database " ~ filename.idup);
 		}
 		super();
 	}
@@ -214,6 +213,13 @@ class Sqlite3Error: Error {
 
 class Sqlite3BindError: Sqlite3Error {
 	this(T)(int code, T value) {
-		super(code, `Unable to bind value "` ~ to!string(value));
+		static if(is(immutable(T): immutable(void[]))) {
+			string str = "<void[]>";
+		} else static if(is(immutable(T): immutable(char[]))) {
+			string str = '"' ~ value ~ '"';
+		} else {
+			string str = value.to!string();
+		}
+		super(code, `Unable to bind value ` ~ str);
 	}
 }

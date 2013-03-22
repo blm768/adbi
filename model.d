@@ -188,7 +188,6 @@ mixin template Model(string _tableName) {
 		//To do: remove cast if possible.
 		saveBuilder.columns = cast(const(char)[][])columnNames;
 		saveQuery = saveBuilder.query(db);
-		writeln(saveQuery.statement);
 		updateQuery = db.query(updateStatement);
 	}
 
