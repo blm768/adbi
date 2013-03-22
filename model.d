@@ -172,7 +172,7 @@ mixin template Model(string _tableName) {
 				if(col) {
 					memberToColumn ~= *col;
 					columnToMember[*col] = member.offsetof;
-					if(memberName != "_id_") {
+					static if(memberName != "_id_") {
 						columnNames ~= toColumnName!memberName;
 					}
 				} else {
@@ -185,6 +185,7 @@ mixin template Model(string _tableName) {
 		updateStatement ~= "=? WHERE id=?;";
 		QueryBuilder saveBuilder;
 		saveBuilder.table = tableName;
+		saveBuilder.operation = QueryBuilder.Operation.insert;
 		//To do: remove cast if possible.
 		saveBuilder.columns = cast(const(char)[][])columnNames;
 		saveQuery = saveBuilder.query(db);
