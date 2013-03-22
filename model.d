@@ -45,7 +45,7 @@ mixin template Model(string _tableName) {
 		//To do: file bug report? (cast seems like it shouldn't be needed)
 		q.columns = cast(const(char)[][])columnNames;
 		//To do: escape?
-		q.fromClause = tableName;
+		q.table = tableName;
 		return q;
 	}
 	
@@ -151,7 +151,6 @@ mixin template Model(string _tableName) {
 	This function must be called before the model can be used for any queries.
 	+/
 	static void updateSchema(Database db) {
-		char[] saveStatement = "INSERT INTO ".dup ~ tableName ~ " (";
 		char[] updateStatement = "UPDATE ".dup ~ tableName ~ " SET ";
 		columnNames = [];
 		Database.Table t;
@@ -182,15 +181,14 @@ mixin template Model(string _tableName) {
 				++i;
 			}
 		}
-		saveStatement ~= columnNames.join(",");
-		saveStatement ~= ") VALUES (";
-		if(i > 1) {
-			saveStatement ~= replicate("?,", i - 1)[0 .. $ - 1];
-		}
-		saveStatement ~= ");";
 		updateStatement ~= columnNames.join("=?, ");
 		updateStatement ~= "=? WHERE id=?;";
-		saveQuery = db.query(saveStatement);
+		QueryBuilder saveBuilder;
+		saveBuilder.table = tableName;
+		//To do: remove cast if possible.
+		saveBuilder.columns = cast(const(char)[][])columnNames;
+		saveQuery = saveBuilder.query(db);
+		writeln(saveQuery.statement);
 		updateQuery = db.query(updateStatement);
 	}
 

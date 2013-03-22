@@ -1,10 +1,9 @@
 module adbi.querybuilder;
 
 import std.algorithm;
+import std.conv;
 import std.range;
 import std.string;
-
-import std.traits;
 
 import adbi.database;
 import adbi.model;
@@ -19,6 +18,7 @@ struct QueryBuilder {
 	+/
 	enum Operation {
 		select,
+		insert,
 		update,
 		del,
 	}
@@ -30,7 +30,7 @@ struct QueryBuilder {
 	///The conditions appearing in the WHERE clause
 	const(char)[][] whereConditions;
 	///The source table or expression
-	const(char)[] fromClause;
+	const(char)[] table;
 	
 	///Creates a Query from this object
 	@property Query query(Database db) {
@@ -39,22 +39,26 @@ struct QueryBuilder {
 	
 	///Creates an SQL statement from this object
 	@property const(char)[] statement() {
-		const(char)[] base;
+		const(char)[] statement;
+		if(table.length == 0) {
+			throw new InvalidQueryError("No table provided");
+		}
 		switch(operation) {
 			case Operation.select:
-				if(fromClause.length == 0) {
-					throw new InvalidQueryError("No fromClause provided");
-				}
 				//To do: remove saves?
-				base = "SELECT (%s) FROM %s".format(columns.save.join(","), fromClause);
+				statement = "SELECT (%s) FROM %s".format(columns.save.join(","), table);
 				if(whereConditions.length > 0) {
-					base ~= " WHERE ";
-					base ~= whereClause;
+					statement ~= " WHERE ";
+					statement ~= whereClause;
 				}
-				return base;
+				break;
+			case Operation.insert:
+				statement = "INSERT INTO %s (%s) VALUES (%s)".format(table, columns.save.join(","), std.range.repeat("?", columns.length).join(","));
+				break;
 			default:
-				assert(false);
+				assert(false, "Unsupported operation " ~ operation.to!string);
 		}
+		return statement;
 	}
 	
 	///Returns a QueryBuilder that is a copy of this one with an added whereCondition
@@ -65,7 +69,7 @@ struct QueryBuilder {
 	}
 	
 	@property const(char)[] whereClause() {
-		return whereConditions.save.map!(s => "(%s)".format(s)).join(" AND ");
+		return whereConditions.save.map!(s => "(%s)".format(s))().join(" AND ");
 	}
 }
 
@@ -79,6 +83,34 @@ struct ModelQueryBuilder(Model) {
 		return Model.query(statement);
 	}
 	
+	@property const(char)[] statement() {
+		return builder.statement;
+	}
+	
+	@property const(char)[][] columns() {
+		return builder.columns;
+	}
+	
+	@property void columns(const(char)[][] value) {
+		builder.columns = value;
+	}
+	
+	@property const(char)[] table() {
+		return builder.table;
+	}
+	
+	@property void table(const(char)[] value) {
+		builder.table = value;
+	}
+	
+	typeof(this) where(const(char)[] condition) {
+		auto result = this;
+		result.builder = builder.where(condition);
+		return result;
+	}
+	
+	//To do: wrap builder's methods.
+	
+	private:
 	QueryBuilder builder;
-	alias builder this;
 }
