@@ -56,7 +56,7 @@ struct QueryBuilder {
 				statement = "INSERT INTO %s (%s) VALUES (%s)".format(table, columns.save.join(","), std.range.repeat("?", columns.length).join(","));
 				break;
 			default:
-				assert(false, "Unsupported operation " ~ operation.to!string);
+				assert(false, "Unsupported operation " ~ operation.to!string());
 		}
 		return statement;
 	}
