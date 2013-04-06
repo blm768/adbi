@@ -108,7 +108,6 @@ class Sqlite3Database: Database {
 			return this.outer;
 		}
 		
-		//To do: change indices to 0-based?
 		void bindAt(size_t index, int value) {
 			int status = sqlite3_bind_int(_s, cast(int)index + 1, value);
 			if(status)
