@@ -14,6 +14,7 @@ Mixin template that makes a struct act as a model
 mixin template Model(string _tableName) {
 	enum string tableName = _tableName;
 	static string[] columnNames;
+	static string[] columnTypes;
 	static size_t[] memberToColumn;
 	static size_t[] columnToMember;
 	
@@ -31,6 +32,7 @@ mixin template Model(string _tableName) {
 	private:
 	static Query saveQuery;
 	static Query updateQuery;
+	static Query createQuery;
 	
 	public:
 	/++
@@ -60,6 +62,10 @@ mixin template Model(string _tableName) {
 		auto q = database.query("SELECT * FROM " ~ tableName ~ " WHERE id = ? LIMIT 1;");
 		q.bind(id);
 		return q.advance() == QueryStatus.hasData;
+	}
+
+	static void createTable(Database db) {
+		db.createTable(tableName, "id" ~ columnNames, "integer primary key" ~ columnTypes);
 	}
 	
 	//To do: versions that are told if the object exists in the database?
@@ -116,6 +122,7 @@ mixin template Model(string _tableName) {
 	}
 	
 	private:
+	@PrimaryKey
 	size_t _id_;
 	
 	public:
@@ -151,7 +158,6 @@ mixin template Model(string _tableName) {
 	This function must be called before the model can be used for any queries.
 	+/
 	static void updateSchema(Database db) {
-		char[] updateStatement = "UPDATE ".dup ~ tableName ~ " SET ";
 		columnNames = [];
 		Database.Table t;
 		try {
@@ -160,6 +166,7 @@ mixin template Model(string _tableName) {
 			throw new Error("Table " ~ tableName ~ " not found");
 		}
 		memberToColumn.length = 0;
+		//To do: optimize?
 		columnToMember = replicate([size_t.max], t.columnNames.length);
 		size_t i = 0;
 		enum typeof(this) instance = typeof(this).init;
@@ -168,39 +175,74 @@ mixin template Model(string _tableName) {
 			//Is this an instance member?
 			//To do: test; this might not always work.
 			static if(isInstanceDataMember!member) {
-				auto col = toColumnName!memberName in t.columnIndices;
-				if(col) {
-					memberToColumn ~= *col;
-					columnToMember[*col] = member.offsetof;
-					static if(memberName != "_id_") {
-						columnNames ~= toColumnName!memberName;
+				alias toColumnName!memberName colName;
+				//Does this member map to a column?
+				static if(is(typeof(colName) == string)) {
+					auto col = colName in t.columnIndices;
+					//Is this column actually in the table?
+					if(col) {
+						memberToColumn ~= *col;
+						columnToMember[*col] = member.offsetof;
+						//We exclude the id column for convenience when implementing some of the queries.
+						static if(memberName != "_id_") {
+							columnNames ~= toColumnName!memberName;
+							columnTypes ~= columnType!(member);
+						}
+					} else {
+						throw new Error("Column " ~ toColumnName!memberName ~ " does not exist in table " ~ tableName ~ ".");
 					}
-				} else {
-					throw new Error("Column " ~ toColumnName!memberName ~ " does not exist in table " ~ tableName ~ ".");
 				}
 				++i;
 			}
 		}
-		updateStatement ~= columnNames.join("=?, ");
-		updateStatement ~= "=? WHERE id=?;";
-		QueryBuilder saveBuilder;
-		saveBuilder.table = tableName;
+		QueryBuilder saveBuilder = builder();
 		saveBuilder.operation = QueryBuilder.Operation.insert;
-		//To do: remove cast if possible.
-		saveBuilder.columns = cast(const(char)[][])columnNames;
 		saveQuery = saveBuilder.query(db);
-		updateQuery = db.query(updateStatement);
+		QueryBuilder updateBuilder = builder();
+		updateBuilder.operation = QueryBuilder.operation.update;
+		updateBuilder.conditions = ["id = ?"];
+		updateQuery = updateBuilder.query(db);
 	}
 
-	//If only CTFE would kick in...
-	//To do: how to handle members w/ only a leading underscore?
+	static QueryBuilder builder() {
+		QueryBuilder b;
+		b.table = tableName;
+		//To do: remove cast if possible.
+		b.columns = cast(const(char)[][])columnNames;
+		return b;
+	}
+
 	template toColumnName(string memberName) {
-		static if(memberName[0] == '_' && memberName[$ - 1] == '_') {
-			enum string toColumnName = memberName[1 .. $ - 1];
+		static if(memberName[0] == '_') {
+			static if(memberName[$ - 1] == '_') {
+				enum string toColumnName = memberName[1 .. $ - 1];
+			} else {
+				alias void toColumnName;
+			}
 		} else {
 			enum string toColumnName = memberName;
 		}
 	}
+}
+
+enum PrimaryKey;
+
+template columnType(alias value) {
+	alias columnBaseType!(typeof(value)) columnType;
+}
+
+template columnBaseType(T) {}
+
+template columnBaseType(T: int) {
+	enum columnBaseType = "integer";
+}
+
+template columnBaseType(T: string) {
+	enum columnBaseType = "varchar";
+}
+
+template columnBaseType(T: immutable(ubyte)[]) {
+	enum columnBaseType = "blob";
 }
 
 /++

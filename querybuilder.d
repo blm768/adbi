@@ -28,7 +28,7 @@ struct QueryBuilder {
 	///The names of the columns/expressions to be returned by the query
 	const(char)[][] columns;
 	///The conditions appearing in the WHERE clause
-	const(char)[][] whereConditions;
+	const(char)[][] conditions;
 	///The source table or expression
 	const(char)[] table;
 	
@@ -47,13 +47,21 @@ struct QueryBuilder {
 			case Operation.select:
 				//To do: remove saves?
 				statement = "SELECT (%s) FROM %s".format(columns.save.join(","), table);
-				if(whereConditions.length > 0) {
+				if(conditions.length > 0) {
 					statement ~= " WHERE ";
 					statement ~= whereClause;
 				}
 				break;
 			case Operation.insert:
 				statement = "INSERT INTO %s (%s) VALUES (%s)".format(table, columns.save.join(","), std.range.repeat("?", columns.length).join(","));
+				break;
+			case Operation.update:
+				//To do: consider case where there are no columns.
+				statement = "UPDATE %s SET %s=?".format(table, columns.join("=?, "));
+				if(conditions.length > 0) {
+					statement ~= " WHERE ";
+					statement ~= whereClause;
+				}
 				break;
 			default:
 				assert(false, "Unsupported operation " ~ operation.to!string());
@@ -64,12 +72,12 @@ struct QueryBuilder {
 	///Returns a QueryBuilder that is a copy of this one with an added whereCondition
 	QueryBuilder where(const(char)[] condition) {
 		auto result = this;
-		result.whereConditions ~= condition;
+		result.conditions ~= condition;
 		return result;
 	}
 	
 	@property const(char)[] whereClause() {
-		return whereConditions.save.map!(s => "(%s)".format(s))().join(" AND ");
+		return conditions.save.map!(s => "(%s)".format(s))().join(" AND ");
 	}
 }
 

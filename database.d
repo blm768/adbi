@@ -1,6 +1,7 @@
 module adbi.database;
 
 import std.stdio;
+import std.string;
 
 /++
 Represents a database connection
@@ -43,7 +44,25 @@ abstract class Database {
 	Should never be modified by the user
 	+/
 	Table[string] tables;
-	
+
+	void createTable(string name, string[] columnNames, string[] columnTypes) in {
+		//To do: make more error-safe?
+		assert(columnNames.length == columnTypes.length);
+	} body {
+		string s = "CREATE TABLE %s (".format(name);
+		foreach(i, colName; columnNames[0 .. $-1]) {
+			s ~= "%s %s,".format(colName, columnTypes[i]);
+		}
+		//This will be a problem if the lengths don't match.
+		s ~= "%s %s".format(columnNames[$-1], columnTypes[$-1]);
+		s ~= ")";
+
+		auto q = query(s);
+		q.advance();
+
+		updateSchema();
+	}
+
 	/++
 	Updates the database object to reflect changes in the database's schema
 	
