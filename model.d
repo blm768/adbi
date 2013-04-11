@@ -264,7 +264,7 @@ template columnBaseType(T: string) {
 	enum columnBaseType = "varchar";
 }
 
-template columnBaseType(T: immutable(ubyte)[]) {
+template columnBaseType(T: immutable(void)[]) {
 	enum columnBaseType = "blob";
 }
 
