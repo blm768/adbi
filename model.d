@@ -65,6 +65,7 @@ mixin template Model(string _tableName) {
 	}
 
 	static void createTable(Database db) {
+		updateColumns();
 		db.createTable(tableName, "id" ~ columnNames, "integer primary key" ~ columnTypes);
 	}
 	
@@ -151,6 +152,27 @@ mixin template Model(string _tableName) {
 		}
 		return instance;
 	}
+
+	static void updateColumns() {
+		//If we've already run this, just return.
+		if(columnNames.length > 0) {
+			return;
+		}
+		enum typeof(this) instance = typeof(this).init;
+		foreach(memberName; __traits(allMembers, typeof(this))) {
+			mixin("alias instance." ~ memberName ~ " member;");
+			static if(isInstanceDataMember!member) {
+				alias toColumnName!memberName colName;
+				static if(is(typeof(colName) == string)) {
+					//We exclude the id column for convenience when implementing some of the queries.
+					static if(memberName != "_id_") {
+						columnNames ~= toColumnName!memberName;
+						columnTypes ~= columnType!(member);
+					}
+				}
+			}
+		}
+	}
 	
 	/++
 	Associates this model with a database, creating internal structures to accelerate data retrieval
@@ -158,14 +180,14 @@ mixin template Model(string _tableName) {
 	This function must be called before the model can be used for any queries.
 	+/
 	static void updateSchema(Database db) {
-		columnNames = [];
+		updateColumns();
 		Database.Table t;
 		try {
 			t = db.tables[tableName];
 		} catch(RangeError e) {
-			throw new Error("Table " ~ tableName ~ " not found");
+			throw new TableNotFoundException("Table " ~ tableName ~ " not found");
 		}
-		memberToColumn.length = 0;
+		memberToColumn = [];
 		//To do: optimize?
 		columnToMember = replicate([size_t.max], t.columnNames.length);
 		size_t i = 0;
@@ -183,13 +205,8 @@ mixin template Model(string _tableName) {
 					if(col) {
 						memberToColumn ~= *col;
 						columnToMember[*col] = member.offsetof;
-						//We exclude the id column for convenience when implementing some of the queries.
-						static if(memberName != "_id_") {
-							columnNames ~= toColumnName!memberName;
-							columnTypes ~= columnType!(member);
-						}
 					} else {
-						throw new Error("Column " ~ toColumnName!memberName ~ " does not exist in table " ~ tableName ~ ".");
+						throw new Exception("Column " ~ toColumnName!memberName ~ " does not exist in table " ~ tableName ~ ".");
 					}
 				}
 				++i;
@@ -225,7 +242,13 @@ mixin template Model(string _tableName) {
 	}
 }
 
+class TableNotFoundException: Exception {
+	this(string msg) { super(msg); }
+}
+
+//To do: actually make this do something?
 enum PrimaryKey;
+enum Indexed;
 
 template columnType(alias value) {
 	alias columnBaseType!(typeof(value)) columnType;

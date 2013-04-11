@@ -100,6 +100,15 @@ enum QueryStatus {
 	notStarted, hasData, finished, busy
 }
 
+struct Index {
+	string name;
+	string[] columns;
+
+	void create(Database db) {
+		
+	}
+}
+
 interface Query {
 	QueryStatus advance();
 	@property QueryStatus status();
