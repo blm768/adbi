@@ -5,19 +5,24 @@ public import std.array;
 import std.string;
 
 public import adbi.database;
-public import adbi.traits;
+public import adbi.model.traits;
 public import adbi.querybuilder;
 
 public import adbi.model.join;
+public import adbi.model.relation;
 
 /++
 Mixin template that makes a struct act as a model
 +/
 mixin template Model(string _tableName) {
 	enum string tableName = _tableName;
-	static string[] columnNames;
-	static string[] columnTypes;
+
+	//TODO: make fixed-length?
+	static const(char)[][] columnNames;
+	static const(char)[][] columnTypes;
+	//Maps member indices to column indices
 	static size_t[] memberToColumn;
+	//Maps column indices to member indices
 	static size_t[] columnToMember;
 	
 	/++
@@ -44,14 +49,14 @@ mixin template Model(string _tableName) {
 		return _id_;
 	}
 	
-	static @property ModelQueryBuilder!(typeof(this)) all() {
-		ModelQueryBuilder!(typeof(this)) q;
-		//To do: file bug report? (cast seems like it shouldn't be needed)
-		q.columns = cast(const(char)[][])columnNames;
-		//To do: escape?
+	static @property Relation!(typeof(this)) all() {
+		Relation!(typeof(this)) q;
+		q.columns = columnNames;
 		q.table = tableName;
 		return q;
 	}
+
+	alias all this;
 	
 	/++
 	Returns true if the record has been saved to the database
@@ -80,9 +85,9 @@ mixin template Model(string _tableName) {
 			//To do: update columns.
 			updateQuery.reset();
 			size_t i = 0;
-			foreach(memberName; __traits(allMembers, typeof(this))) {
+			foreach(memberName; members!(typeof(this))) {
 				mixin("alias this." ~ memberName ~ " member;");
-				static if(isInstanceDataMember!member) {
+				static if(isField!member) {
 					static if(memberName != "_id_") {
 						updateQuery.bindAt(i, member);
 						++i;
@@ -96,9 +101,9 @@ mixin template Model(string _tableName) {
 		} else {
 			saveQuery.reset();
 			size_t i = 0;
-			foreach(memberName; __traits(allMembers, typeof(this))) {
+			foreach(memberName; members!(typeof(this))) {
 				mixin("alias this." ~ memberName ~ " member;");
-				static if(isInstanceDataMember!member) {
+				static if(isField!member) {
 					static if(memberName != "_id_") {
 						saveQuery.bindAt(i, member);
 						++i;
@@ -137,10 +142,11 @@ mixin template Model(string _tableName) {
 		assert(q.status == QueryStatus.hasData, "Attempt to retrieve data from a query with no valid data available");
 		size_t i = 0;
 		typeof(this) instance;
-		foreach(memberName; __traits(allMembers, typeof(this))) {
+		foreach(memberName; members!(typeof(this))) {
 			mixin("alias instance." ~ memberName ~ " member;");
-			static if(isInstanceDataMember!member) {
+			static if(isField!member) {
 				if(columnToMember[i] < size_t.max) {
+					//For some reason, we can't just assign to member, and &member doesn't work.
 					auto ptr = &__traits(getMember, instance, memberName);
 					*ptr = q.get!(typeof(member))(memberToColumn[i] + startIndex);
 				} else {
@@ -158,9 +164,9 @@ mixin template Model(string _tableName) {
 			return;
 		}
 		enum typeof(this) instance = typeof(this).init;
-		foreach(memberName; __traits(allMembers, typeof(this))) {
+		foreach(memberName; members!(typeof(this))) {
 			mixin("alias instance." ~ memberName ~ " member;");
-			static if(isInstanceDataMember!member) {
+			static if(isField!member) {
 				alias toColumnName!memberName colName;
 				static if(is(typeof(colName) == string)) {
 					//We exclude the id column for convenience when implementing some of the queries.
@@ -191,11 +197,11 @@ mixin template Model(string _tableName) {
 		columnToMember = replicate([size_t.max], t.columnNames.length);
 		size_t i = 0;
 		enum typeof(this) instance = typeof(this).init;
-		foreach(memberName; __traits(allMembers, typeof(this))) {
+		foreach(memberName; members!(typeof(this))) {
 			mixin("alias instance." ~ memberName ~ " member;");
 			//Is this an instance member?
 			//To do: test; this might not always work.
-			static if(isInstanceDataMember!member) {
+			static if(isField!member) {
 				alias toColumnName!memberName colName;
 				//Does this member map to a column?
 				static if(is(typeof(colName) == string)) {

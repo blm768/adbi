@@ -45,7 +45,7 @@ abstract class Database {
 	+/
 	Table[string] tables;
 
-	void createTable(string name, string[] columnNames, string[] columnTypes) in {
+	void createTable(const(char)[] name, const(char)[][] columnNames, const(char)[][] columnTypes) in {
 		//To do: make more error-safe?
 		assert(columnNames.length == columnTypes.length);
 	} body {
