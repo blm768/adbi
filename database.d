@@ -35,7 +35,7 @@ abstract class Database {
 	void rollBack();
 		
 	/++
-	Returns the ID of the last row to be inserted
+	Returns the ID of the last row that was inserted
 	+/
 	@property size_t lastInsertedRowId();
 	
@@ -62,6 +62,8 @@ abstract class Database {
 
 		updateSchema();
 	}
+
+	bool tableExists(string name);
 
 	/++
 	Updates the database object to reflect changes in the database's schema
@@ -142,7 +144,7 @@ interface Query {
 	}
 	
 	template get(T: string) {
-		alias getText get; 
+		alias getString get; 
 	}
 	
 	template get(T: immutable(void)[]) {
@@ -152,7 +154,7 @@ interface Query {
 	int getInt(size_t index);
 	long getLong(size_t index);
 	double getDouble(size_t index);
-	string getText(size_t index);
+	string getString(size_t index);
 	immutable(void)[] getBlob(size_t index);
 	
 	string getColumnName(size_t index);

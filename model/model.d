@@ -1,4 +1,4 @@
-module adbi.model;
+module adbi.model.model;
 
 public import core.exception;
 public import std.array;
@@ -7,6 +7,8 @@ import std.string;
 public import adbi.database;
 public import adbi.traits;
 public import adbi.querybuilder;
+
+public import adbi.model.join;
 
 /++
 Mixin template that makes a struct act as a model
@@ -52,23 +54,21 @@ mixin template Model(string _tableName) {
 	}
 	
 	/++
-	Returns true if the record is stored in the database, false otherwise
+	Returns true if the record has been saved to the database
+	
+	Note that this only checks the record object to see if it has
+	an ID: it doesn't perform a database query.
 	+/
-	@property bool inDatabase() {
+	@property bool persisted() {
 		//To do: verify that this works for all DBs.
-		if(id == 0)
-			{return false;}
-		//To do: don't constantly recreate this query.
-		auto q = database.query("SELECT * FROM " ~ tableName ~ " WHERE id = ? LIMIT 1;");
-		q.bind(id);
-		return q.advance() == QueryStatus.hasData;
+		return id != 0;
 	}
 
 	static void createTable(Database db) {
 		updateColumns();
 		db.createTable(tableName, "id" ~ columnNames, "integer primary key" ~ columnTypes);
 	}
-	
+
 	//To do: versions that are told if the object exists in the database?
 	/++
 	Saves the record to the database.
@@ -76,8 +76,7 @@ mixin template Model(string _tableName) {
 	If the record already exists in the database, the corresponding row will be updated.
 	+/
 	void save() {
-		//To do: semantics of saving an object that was removed from the database?
-		if(inDatabase) {
+		if(persisted) {
 			//To do: update columns.
 			updateQuery.reset();
 			size_t i = 0;
@@ -282,38 +281,6 @@ mixin template reference(string name, string foreignTableName, T) {
 		referenceQuery.bind(` ~ name ~ `_id);
 		return T.fromQuery(referenceQuery);
 	}`);
-}
-
-/++
-Represents a single result from a join operation
-+/
-struct Join(T ...) {
-	mixin joinMembers!T;
-	
-	static Join fromQuery(Query q) {
-		size_t index = 0;
-		typeof(this) result;
-		foreach(memberName; __traits(allMembers, Join)) {
-			mixin("alias result." ~ memberName ~ " member;");
-			static if(isInstanceDataMember!member) {
-				auto ptr = &__traits(getMember, result, memberName);
-				*ptr = typeof(*ptr).fromQuery(q, index);
-				index += typeof(member).memberToColumn.length;
-			}
-		}
-		return result;
-	}
-}
-
-private template joinMembers(T ...) {
-	static if(T.length > 0) {
-		static if(T[0].stringof.length > 1) {
-			mixin("T[0] " ~ toLower(T[0].stringof[0 .. 1]) ~ T[0].stringof[1 .. $] ~ ";");
-		} else {
-			mixin("T[0] " ~ toLower(T[0].stringof) ~ ";");
-		}
-		mixin joinMembers!(T[1 .. $]);
-	}
 }
 
 /++

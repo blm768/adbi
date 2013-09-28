@@ -24,7 +24,7 @@ class Sqlite3Database: Database {
 	}
 		
 	override Query query(const(char)[] statement) {
-		return new Sqlite3Query(statement);
+		return new Query(statement);
 	}
 	
 	override void startTransaction() {
@@ -37,6 +37,13 @@ class Sqlite3Database: Database {
 	
 	override void rollBack() {
 		assert(false);
+	}
+
+	override bool tableExists(string name) {
+		auto query = this.query("SELECT count(*) FROM sqlite_master WHERE type='table' AND name=?");
+		query.bind(name);
+		query.advance();
+		return query.getInt(0) == 1;
 	}
 	
 	override void updateSchema() {
@@ -57,7 +64,7 @@ class Sqlite3Database: Database {
 	}
 	
 	//To do: file bug? (Just calling this Query gives an error.)
-	class Sqlite3Query: adbi.database.Query {
+	class Query: adbi.database.Query {
 		this(const(char)[] statement) {
 			_statement = statement;
 			_s = compileStatement(statement);
@@ -152,7 +159,7 @@ class Sqlite3Database: Database {
 			return sqlite3_column_double(_s, cast(int)index);
 		}
 		
-		string getText(size_t index) {
+		string getString(size_t index) {
 			return sqlite3_column_text(_s, cast(int)index)[0 .. sqlite3_column_bytes(_s, cast(int)index)].idup;
 		}
 		

@@ -6,7 +6,7 @@ import std.range;
 import std.string;
 
 import adbi.database;
-import adbi.model;
+import adbi.model.model;
 
 /++
 Represents the contents of a query in an abstract form that can be converted to an SQL statement
