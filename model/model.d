@@ -32,10 +32,6 @@ mixin template Model(string _tableName) {
 		return saveQuery.database;
 	}
 	
-	static ModelQuery!(typeof(this)) query(const(char)[] statement) {
-		return ModelQuery!(typeof(this))(database.query(statement));
-	}
-	
 	private:
 	static Query saveQuery;
 	static Query updateQuery;
@@ -50,13 +46,11 @@ mixin template Model(string _tableName) {
 	}
 	
 	static @property Relation!(typeof(this)) all() {
-		Relation!(typeof(this)) q;
-		q.columns = columnNames;
-		q.table = tableName;
-		return q;
+		return Relation!(typeof(this))(builder());
 	}
 
-	alias all this;
+	//TODO: figure out why aliasing causes a stack overflow.
+	//alias all this;
 	
 	/++
 	Returns true if the record has been saved to the database
@@ -134,17 +128,19 @@ mixin template Model(string _tableName) {
 	/++
 	Creates an instance of the model from the query object's current result
 	+/
-	static typeof(this) fromQuery(Query q, size_t startIndex = 0) {
-		//To do: clearer message?
-		assert(q, "Attempt to retrive " ~ typeof(this).stringof ~ " without a valid query");
+	static typeof(this) fromQuery(Query q, size_t startIndex = 0) in {
+		assert(q);
+	 } body {
 		if(q.status == QueryStatus.notStarted)
 			{q.advance();}
+		//TODO: better error message?
 		assert(q.status == QueryStatus.hasData, "Attempt to retrieve data from a query with no valid data available");
 		size_t i = 0;
 		typeof(this) instance;
 		foreach(memberName; members!(typeof(this))) {
 			mixin("alias instance." ~ memberName ~ " member;");
 			static if(isField!member) {
+				//TODO: move this check to updateSchema()?
 				if(columnToMember[i] < size_t.max) {
 					//For some reason, we can't just assign to member, and &member doesn't work.
 					auto ptr = &__traits(getMember, instance, memberName);
@@ -219,11 +215,11 @@ mixin template Model(string _tableName) {
 		}
 		QueryBuilder saveBuilder = builder();
 		saveBuilder.operation = QueryBuilder.Operation.insert;
-		saveQuery = saveBuilder.query(db);
+		saveQuery = db.query(saveBuilder.statement);
 		QueryBuilder updateBuilder = builder();
 		updateBuilder.operation = QueryBuilder.operation.update;
 		updateBuilder.conditions = ["id = ?"];
-		updateQuery = updateBuilder.query(db);
+		updateQuery = db.query(updateBuilder.statement);
 	}
 
 	static QueryBuilder builder() {
@@ -293,48 +289,34 @@ mixin template reference(string name, string foreignTableName, T) {
 Represents a range of models from a query
 +/
 struct ModelRange(T) {
-	Query q;
-	
-	///
-	@property T front() {
-		return T.fromQuery(q);
-	}
-	
-	///Returns the front and advances the query
-	T popFront() {
-		T value = front;
-		if(q.status == QueryStatus.hasData)
-			{q.advance();}
-		return value;
-	}
-	
-	///
-	@property bool empty() {
-		if(q.status == QueryStatus.notStarted)
-			{q.advance();}
-		return q.status != QueryStatus.hasData;
-	}
-}
+	alias T Model;
 
-/++
-Wraps a Query to include model-specific utilities
-+/
-struct ModelQuery(T) {
+	this(Query q) {
+		query = q;
+	}
+
 	Query query;
 	
-	alias query this;
+	///
+	@property Model front() {
+		//TODO: cache?
+		return Model.fromQuery(query);
+	}
 	
+	void popFront() {
+		if(empty) {
+			throw new RangeError;
+		} else {
+			query.advance();
+		}
+	}
+	
+	///
 	@property bool empty() {
-		return results.empty;
-	}
-	
-	@property ModelRange!T results() {
-		return ModelRange!T(query);
-	}
-	
-	@property T first() {
-		return results.front;
+		if(query.status == QueryStatus.notStarted) {
+			query.advance();
+		}
+		return query.status != QueryStatus.hasData;
 	}
 }
-
 

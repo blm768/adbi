@@ -32,11 +32,6 @@ struct QueryBuilder {
 	///The source table or expression
 	const(char)[] table;
 	
-	///Creates a Query from this object
-	@property Query query(Database db) {
-		return db.query(statement);
-	}
-	
 	///Creates an SQL statement from this object
 	@property const(char)[] statement() {
 		const(char)[] statement;

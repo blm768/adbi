@@ -7,34 +7,49 @@ import adbi.querybuilder;
 Associates a QueryBuilder with a Model
 +/
 struct Relation(Model) {
-	@property ModelQuery!Model query() {
-		return Model.query(statement);
+	this(QueryBuilder builder) {
+		this.builder = builder;
 	}
-	
+
 	@property const(char)[] statement() {
 		return builder.statement;
 	}
 	
+	//TODO: caching?
+	@property Query query() {
+		return Model.database.query(statement);
+	}
+
+	@property ModelRange!Model results() {
+		return ModelRange!Model(query);
+	}
+
+	alias results this;
+
 	@property const(char)[][] columns() {
 		return builder.columns;
-	}
-	
-	@property void columns(const(char)[][] value) {
-		builder.columns = value;
 	}
 	
 	@property const(char)[] table() {
 		return builder.table;
 	}
 	
-	@property void table(const(char)[] value) {
-		builder.table = value;
-	}
-	
 	typeof(this) where(const(char)[] condition) {
 		auto result = this;
 		result.builder = builder.where(condition);
 		return result;
+	}
+
+	size_t count() {
+		auto builder = this.builder;
+		builder.columns = ["count(*)"];
+		auto query = Model.database.query(builder.statement);
+		query.advance();
+		return query.get!int(0);
+	}
+
+	@property Model first() {
+		return results.front;
 	}
 	
 	private:
