@@ -11,6 +11,8 @@ public import adbi.querybuilder;
 public import adbi.model.join;
 public import adbi.model.relation;
 
+alias ulong RecordId;
+
 /++
 Mixin template that makes a struct act as a model
 +/
@@ -40,8 +42,10 @@ mixin template Model(string _tableName) {
 	public:
 	/++
 	Returns the record's ID (corresponding to the primary key)
+
+	TODO: make type of ID configurable?
 	+/
-	@property size_t id() {
+	@property RecordId id() {
 		return _id_;
 	}
 	
@@ -90,7 +94,7 @@ mixin template Model(string _tableName) {
 			}
 			updateQuery.bindAt(i, id);
 			assert(updateQuery.advance() == QueryStatus.finished);
-			//To do: remove?
+			//TODO: remove?
 			updateQuery.reset();
 		} else {
 			saveQuery.reset();
@@ -122,7 +126,7 @@ mixin template Model(string _tableName) {
 	
 	private:
 	@PrimaryKey
-	size_t _id_;
+	RecordId _id_;
 	
 	public:
 	/++
@@ -182,10 +186,8 @@ mixin template Model(string _tableName) {
 	+/
 	static void updateSchema(Database db) {
 		updateColumns();
-		Database.Table t;
-		try {
-			t = db.tables[tableName];
-		} catch(RangeError e) {
+		auto t = db.tables.get(tableName, null);
+		if(!t) {
 			throw new TableNotFoundException("Table " ~ tableName ~ " not found");
 		}
 		memberToColumn = [];
@@ -257,11 +259,19 @@ template columnType(alias value) {
 
 template columnBaseType(T) {}
 
+template columnBaseType(T) if(isIntegral!T && !isSigned!T) {
+	enum columnBaseType = "unsigned " + columnBaseType(Signed!T);
+}
+
 template columnBaseType(T: int) {
 	enum columnBaseType = "integer";
 }
 
-template columnBaseType(T: string) {
+template columnBaseType(T: long) {
+	enum columnBaseType = "integer";
+}
+
+template columnBaseType(T: char[]) {
 	enum columnBaseType = "varchar";
 }
 
@@ -272,12 +282,12 @@ template columnBaseType(T: immutable(void)[]) {
 /++
 When mixed into a model, this creates a relational link to another model using a foreign key
 +/
-mixin template reference(string name, string foreignTableName, T) {
-	static Query referenceQuery;
-	mixin("size_t " ~ name ~ "_id;");
+mixin template reference(T, string name) {
+	static private Query referenceQuery;
+	mixin("RecordId " ~ name ~ "_id;");
 	mixin("@property T " ~ name ~ `(){
 		if(!referenceQuery) {
-			referenceQuery = database.query("SELECT * FROM " ~ foreignTableName ~ " WHERE id = ? LIMIT 1;");
+			referenceQuery = database.query("SELECT * FROM " ~ T.tableName ~ " WHERE id = ? LIMIT 1;");
 		}
 		referenceQuery.reset();
 		referenceQuery.bind(` ~ name ~ `_id);

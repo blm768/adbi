@@ -76,7 +76,7 @@ abstract class Database {
 	abstract class Table {
 		this(const(char)[] name) {
 			_name = name;
-			updateSchema();
+			this.updateSchema();
 		}
 		
 		void updateSchema();
@@ -134,28 +134,42 @@ interface Query {
 	template get(T: int) {
 		alias getInt get;
 	}
-	
+
+	template get(T: uint) {
+		alias getUInt get;
+	}
+
 	template get(T: long) {
 		alias getLong get;
+	}
+
+	template get(T: ulong) {
+		alias getULong get;
 	}
 	
 	template get(T: double) {
 		alias getDouble get;
 	}
-	
-	template get(T: string) {
+
+	template get(T: char[]) {
 		alias getString get; 
 	}
-	
-	template get(T: immutable(void)[]) {
+
+	T get(T: string)(size_t index) {
+		return cast(string)getString(index);
+	}
+
+	template get(T: void[]) {
 		alias getBlob get;
 	}
 	
 	int getInt(size_t index);
+	uint getUInt(size_t index);
 	long getLong(size_t index);
+	ulong getULong(size_t index);
 	double getDouble(size_t index);
-	string getString(size_t index);
-	immutable(void)[] getBlob(size_t index);
+	char[] getString(size_t index);
+	void[] getBlob(size_t index);
 	
 	string getColumnName(size_t index);
 }

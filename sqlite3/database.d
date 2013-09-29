@@ -51,7 +51,7 @@ class Sqlite3Database: Database {
 		tables.clear();
 		while(q.advance() == QueryStatus.hasData) {
 			const(char)[] text = q.get!string(0);
-			tables[text] = new Sqlite3Table(text);
+			tables[text] = new Table(text);
 		}
 	}
 	
@@ -148,27 +148,35 @@ class Sqlite3Database: Database {
 		
 		//To do: error checking?
 		int getInt(size_t index) {
-			return cast(long)sqlite3_column_int(_s, cast(int)index);
+			return sqlite3_column_int(_s, cast(int)index);
+		}
+
+		uint getUInt(size_t index) {
+			return cast(uint)sqlite3_column_int(_s, cast(int)index);
 		}
 		
 		long getLong(size_t index) {
-			return cast(long)sqlite3_column_int64(_s, cast(int)index);
+			return sqlite3_column_int64(_s, cast(int)index);
 		}
 		
+		ulong getULong(size_t index) {
+			return cast(ulong)sqlite3_column_int64(_s, cast(int)index);
+		}
+
 		double getDouble(size_t index) {
 			return sqlite3_column_double(_s, cast(int)index);
 		}
 		
-		string getString(size_t index) {
-			return sqlite3_column_text(_s, cast(int)index)[0 .. sqlite3_column_bytes(_s, cast(int)index)].idup;
+		char[] getString(size_t index) {
+			return sqlite3_column_text(_s, cast(int)index)[0 .. sqlite3_column_bytes(_s, cast(int)index)].dup;
 		}
 		
-		immutable(void)[] getBlob(size_t index) {
-			return sqlite3_column_blob(_s, cast(int)index)[0 .. sqlite3_column_bytes(_s, cast(int)index)].idup;
+		void[] getBlob(size_t index) {
+			return sqlite3_column_blob(_s, cast(int)index)[0 .. sqlite3_column_bytes(_s, cast(int)index)].dup;
 		}
 		
 		string getColumnName(size_t index) {
-			return to!string(sqlite3_column_name(_s, cast(int)index));
+			return sqlite3_column_name(_s, cast(int)index).to!string;
 		}
 	
 		~this() {
@@ -181,7 +189,7 @@ class Sqlite3Database: Database {
 		QueryStatus _status;
 	}
 	
-	class Sqlite3Table: Table {
+	class Table: Database.Table {
 		this(const(char)[] name) {
 			super(name);
 		}
