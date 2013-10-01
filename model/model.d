@@ -20,12 +20,8 @@ mixin template Model(string _tableName) {
 	enum string tableName = _tableName;
 
 	//TODO: make fixed-length?
-	static const(char)[][] columnNames;
+	static immutable(string[]) columnNames = [fields!(typeof(this))];
 	static const(char)[][] columnTypes;
-	//Maps member indices to column indices
-	static size_t[] memberToColumn;
-	//Maps column indices to member indices
-	static size_t[] columnToMember;
 	
 	/++
 	Returns the database with which this model is associated
@@ -108,6 +104,7 @@ mixin template Model(string _tableName) {
 					}
 				}
 			}
+			//TODO: replace these assertions!
 			assert(saveQuery.advance() == QueryStatus.finished);
 			//To do: remove?
 			saveQuery.reset();
@@ -119,6 +116,7 @@ mixin template Model(string _tableName) {
 	void destroy() {
 		if(id > 0) {
 			//auto q = 
+			assert(false);
 		} else {
 			throw new Error("Attempt to delete object that was never saved");
 		}
@@ -139,19 +137,14 @@ mixin template Model(string _tableName) {
 			{q.advance();}
 		//TODO: better error message?
 		assert(q.status == QueryStatus.hasData, "Attempt to retrieve data from a query with no valid data available");
-		size_t i = 0;
+		size_t i = startIndex;
 		typeof(this) instance;
 		foreach(memberName; members!(typeof(this))) {
 			mixin("alias instance." ~ memberName ~ " member;");
 			static if(isField!member) {
-				//TODO: move this check to updateSchema()?
-				if(columnToMember[i] < size_t.max) {
-					//For some reason, we can't just assign to member, and &member doesn't work.
-					auto ptr = &__traits(getMember, instance, memberName);
-					*ptr = q.get!(typeof(member))(memberToColumn[i] + startIndex);
-				} else {
-					assert(false, "Field " ~ memberName ~ " not present in database");
-				}
+				//For some reason, we can't just assign to member, and &member doesn't work.
+				auto ptr = &__traits(getMember, instance, memberName);
+				*ptr = q.get!(typeof(member))(i);
 				++i;
 			}
 		}
@@ -160,7 +153,7 @@ mixin template Model(string _tableName) {
 
 	static void updateColumns() {
 		//If we've already run this, just return.
-		if(columnNames.length > 0) {
+		if(columnTypes.length > 0) {
 			return;
 		}
 		enum typeof(this) instance = typeof(this).init;
@@ -171,7 +164,6 @@ mixin template Model(string _tableName) {
 				static if(is(typeof(colName) == string)) {
 					//We exclude the id column for convenience when implementing some of the queries.
 					static if(memberName != "_id_") {
-						columnNames ~= toColumnName!memberName;
 						columnTypes ~= columnType!(member);
 					}
 				}
@@ -190,9 +182,6 @@ mixin template Model(string _tableName) {
 		if(!t) {
 			throw new TableNotFoundException("Table " ~ tableName ~ " not found");
 		}
-		memberToColumn = [];
-		//To do: optimize?
-		columnToMember = replicate([size_t.max], t.columnNames.length);
 		size_t i = 0;
 		enum typeof(this) instance = typeof(this).init;
 		foreach(memberName; members!(typeof(this))) {
@@ -205,10 +194,7 @@ mixin template Model(string _tableName) {
 				static if(is(typeof(colName) == string)) {
 					auto col = colName in t.columnIndices;
 					//Is this column actually in the table?
-					if(col) {
-						memberToColumn ~= *col;
-						columnToMember[*col] = member.offsetof;
-					} else {
+					if(!col) {
 						throw new Exception("Column " ~ toColumnName!memberName ~ " does not exist in table " ~ tableName ~ ".");
 					}
 				}
@@ -232,6 +218,7 @@ mixin template Model(string _tableName) {
 		return b;
 	}
 
+	//TODO: improve?
 	template toColumnName(string memberName) {
 		static if(memberName[0] == '_') {
 			static if(memberName[$ - 1] == '_') {
