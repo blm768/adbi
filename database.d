@@ -3,6 +3,8 @@ module adbi.database;
 import std.stdio;
 import std.string;
 
+alias ulong RecordID;
+
 /++
 Represents a database connection
 +/
@@ -37,7 +39,7 @@ abstract class Database {
 	/++
 	Returns the ID of the last row that was inserted
 	+/
-	@property size_t lastInsertedRowId();
+	@property RecordID lastInsertedRowID();
 	
 	/++
 	A hash table of all tables in the database

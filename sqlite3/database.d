@@ -19,8 +19,8 @@ class Sqlite3Database: Database {
 		super();
 	}
 	
-	override @property size_t lastInsertedRowId() {
-		return cast(size_t)sqlite3_last_insert_rowid(connection);
+	override @property RecordID lastInsertedRowID() {
+		return cast(RecordID)sqlite3_last_insert_rowid(connection);
 	}
 		
 	override Query query(const(char)[] statement) {

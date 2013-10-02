@@ -6,12 +6,10 @@ import std.string;
 
 public import adbi.database;
 public import adbi.model.traits;
-public import adbi.querybuilder;
+public import adbi.statements;
 
 public import adbi.model.join;
 public import adbi.model.relation;
-
-alias ulong RecordId;
 
 /++
 Mixin template that makes a struct act as a model
@@ -20,7 +18,7 @@ mixin template Model(string _tableName) {
 	enum string tableName = _tableName;
 
 	//TODO: make fixed-length?
-	static immutable(string[]) columnNames = [fields!(typeof(this))];
+	static immutable(string[]) columnNames = ["id", fields!(typeof(this))];
 	static const(char)[][] columnTypes;
 	
 	/++
@@ -41,12 +39,12 @@ mixin template Model(string _tableName) {
 
 	TODO: make type of ID configurable?
 	+/
-	@property RecordId id() {
+	@property RecordID id() {
 		return _id_;
 	}
 	
 	static @property Relation!(typeof(this)) all() {
-		return Relation!(typeof(this))(builder());
+		return Relation!(typeof(this))();
 	}
 
 	//TODO: figure out why aliasing causes a stack overflow.
@@ -65,7 +63,7 @@ mixin template Model(string _tableName) {
 
 	static void createTable(Database db) {
 		updateColumns();
-		db.createTable(tableName, "id" ~ columnNames, "integer primary key" ~ columnTypes);
+		db.createTable(tableName, columnNames, columnTypes);
 	}
 
 	//To do: versions that are told if the object exists in the database?
@@ -108,7 +106,7 @@ mixin template Model(string _tableName) {
 			assert(saveQuery.advance() == QueryStatus.finished);
 			//To do: remove?
 			saveQuery.reset();
-			_id_ = database.lastInsertedRowId;
+			_id_ = database.lastInsertedRowID;
 		}
 	}
 	
@@ -124,7 +122,7 @@ mixin template Model(string _tableName) {
 	
 	private:
 	@PrimaryKey
-	RecordId _id_;
+	RecordID _id_;
 	
 	public:
 	/++
@@ -156,6 +154,7 @@ mixin template Model(string _tableName) {
 		if(columnTypes.length > 0) {
 			return;
 		}
+		columnTypes = ["integer primary key"];
 		enum typeof(this) instance = typeof(this).init;
 		foreach(memberName; members!(typeof(this))) {
 			mixin("alias instance." ~ memberName ~ " member;");
@@ -201,21 +200,8 @@ mixin template Model(string _tableName) {
 				++i;
 			}
 		}
-		QueryBuilder saveBuilder = builder();
-		saveBuilder.operation = QueryBuilder.Operation.insert;
-		saveQuery = db.query(saveBuilder.statement);
-		QueryBuilder updateBuilder = builder();
-		updateBuilder.operation = QueryBuilder.operation.update;
-		updateBuilder.conditions = ["id = ?"];
-		updateQuery = db.query(updateBuilder.statement);
-	}
-
-	static QueryBuilder builder() {
-		QueryBuilder b;
-		b.table = tableName;
-		//To do: remove cast if possible.
-		b.columns = cast(const(char)[][])columnNames;
-		return b;
+		saveQuery = db.query(insertStatement(tableName, columnNames[1 .. $]));
+		updateQuery = db.query(updateStatement(tableName, columnNames[1 .. $]) ~ " WHERE id=?");
 	}
 
 	//TODO: improve?
@@ -271,7 +257,7 @@ When mixed into a model, this creates a relational link to another model using a
 +/
 mixin template reference(T, string name) {
 	static private Query referenceQuery;
-	mixin("RecordId " ~ name ~ "_id;");
+	mixin("RecordID " ~ name ~ "_id;");
 	mixin("@property T " ~ name ~ `(){
 		if(!referenceQuery) {
 			referenceQuery = database.query("SELECT * FROM " ~ T.tableName ~ " WHERE id = ? LIMIT 1;");

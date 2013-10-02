@@ -1,18 +1,21 @@
 module adbi.model.relation;
 
 public import adbi.model.model;
-import adbi.querybuilder;
+import adbi.statements;
 
 /++
 Associates a QueryBuilder with a Model
 +/
-struct Relation(Model) {
-	this(QueryBuilder builder) {
-		this.builder = builder;
-	}
+struct Relation(T) {
+	alias T Model;
 
+	//TODO: use assumeSafeAppend?
 	@property const(char)[] statement() {
-		return builder.statement;
+		auto statement = selectStatement(Model.tableName, Model.columnNames);
+		if(conditions.length) {
+			statement ~= whereClause(conditions);
+		}
+		return statement;
 	}
 	
 	//TODO: caching?
@@ -26,24 +29,18 @@ struct Relation(Model) {
 
 	alias results this;
 
-	@property const(char)[][] columns() {
-		return builder.columns;
-	}
-	
-	@property const(char)[] table() {
-		return builder.table;
-	}
-	
 	typeof(this) where(const(char)[] condition) {
 		auto result = this;
-		result.builder = builder.where(condition);
+		result.conditions ~= condition;
 		return result;
 	}
 
 	size_t count() {
-		auto builder = this.builder;
-		builder.columns = ["count(*)"];
-		auto query = Model.database.query(builder.statement);
+		auto statement = selectStatement(Model.tableName, "count(*)");
+		if(conditions.length) {
+			statement ~= whereClause(conditions);
+		}
+		auto query = Model.database.query(statement);
 		query.advance();
 		return query.get!int(0);
 	}
@@ -51,7 +48,6 @@ struct Relation(Model) {
 	@property Model first() {
 		return results.front;
 	}
-	
-	private:
-	QueryBuilder builder;
+
+	const(char)[][] conditions;
 }
