@@ -188,18 +188,29 @@ template BindTypesOf(T) if(is(T: Query)) {
 }
 
 template BindTypeOf(alias method) {
-	alias ParameterTypeTuple!(method)[1] BindTypeOf;
+	private alias ParameterTypeTuple!(method)[1] secondArgType;
+	static if(is(secondArgType: Variant)) {
+		alias TypeTuple!() BindTypeOf;
+	} else {
+		alias secondArgType BindTypeOf;
+	}
 }
-
-pragma(msg, TemplateMap!(Stringize, BindTypesOf!(Query)));
 
 /**
 For use by Query objects
 
 Implements bindAt!(size_t, Variant)
+
+TODO: convert to a UFCS function?
 */
 mixin template bindVariant() {
 	void bindAt(size_t index, Variant value) {
+		foreach(Type; BindTypesOf!Query) {
+			if(value.type == typeid(Type)) {
+				this.bindAt(index, *(value.peek!Type));
+				return;
+			}
+		}
 		assert(false);
 	}
 }
