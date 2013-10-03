@@ -4,9 +4,15 @@ import std.algorithm;
 import std.conv;
 import std.range;
 import std.string;
+import std.variant;
 
-string whereClause(const(char[])[] conditions) {
-	return " WHERE " ~ conditions.map!(s => "(%s)".format(s))().join(" AND ");
+struct Condition {
+	const(char)[] expression;
+	Variant[] values;
+}
+
+string whereClause(Condition[] conditions) {
+	return " WHERE " ~ conditions.map!(c => "(%s)".format(c.expression))().join(" AND ");
 }
 
 string insertStatement(const(char)[] table, const(char[])[] columns) {

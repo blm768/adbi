@@ -1,7 +1,9 @@
 module adbi.database;
 
-import std.stdio;
 import std.string;
+import std.traits;
+import std.typetuple;
+public import std.variant;
 
 alias ulong RecordID;
 
@@ -122,10 +124,13 @@ interface Query {
 	@property Database database();
 	
 	void bindAt(size_t index, int value);
+	void bindAt(size_t index, uint value);
 	void bindAt(size_t index, long value);
+	void bindAt(size_t index, ulong value);
 	void bindAt(size_t index, double value);
-	void bindAt(size_t index, const(char)[] text);
-	void bindAt(size_t index, const(void)[] blob);
+	void bindAt(size_t index, const(char)[] value);
+	void bindAt(size_t index, const(void)[] value);
+	void bindAt(size_t index, Variant value);
 	
 	void bind(T...)(T args) {
 		foreach(i, value; args) {
@@ -164,7 +169,7 @@ interface Query {
 	template get(T: void[]) {
 		alias getBlob get;
 	}
-	
+
 	int getInt(size_t index);
 	uint getUInt(size_t index);
 	long getLong(size_t index);
@@ -174,4 +179,36 @@ interface Query {
 	void[] getBlob(size_t index);
 	
 	string getColumnName(size_t index);
+}
+
+template BindTypes(T) if(is(T: Query)) {
+	alias BindTypesInternal!(__traits(getOverloads, T, "bindAt")) BindTypes;
+}
+
+private {
+	template BindTypesInternal(overloads ...) {
+		static if(overloads.length == 0) {
+			alias TypeTuple!() BindTypesInternal;
+		} else {
+			private alias ParameterTypeTuple!(overloads[0])[1] BType;
+			static if(is(BType: Variant)) {
+				alias TypeTuple!() BindTypesInternal;
+			} else {
+				alias TypeTuple!(BType, BindTypesInternal!(overloads[1 .. $])) BindTypesInternal;
+			}
+		}
+	}
+}
+
+pragma(msg, BindTypes!(Query));
+
+/**
+For use by Query objects
+
+Implements bindAt!(size_t, Variant)
+*/
+mixin template bindVariant() {
+	void bindAt(size_t index, Variant value) {
+		assert(false);
+	}
 }

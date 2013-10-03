@@ -27,6 +27,17 @@ mixin template Model(string _tableName) {
 	static @property Database database() {
 		return saveQuery.database;
 	}
+
+	static ModelRange!(typeof(this)) query(const(char)[] statement) {
+		return ModelRange!(typeof(this))(database.query(statement));
+	}
+
+	static @property Relation!(typeof(this)) all() {
+		return Relation!(typeof(this))();
+	}
+
+	//TODO: figure out why aliasing causes a stack overflow.
+	//alias all this;
 	
 	private:
 	static Query saveQuery;
@@ -42,13 +53,6 @@ mixin template Model(string _tableName) {
 	@property RecordID id() {
 		return _id_;
 	}
-	
-	static @property Relation!(typeof(this)) all() {
-		return Relation!(typeof(this))();
-	}
-
-	//TODO: figure out why aliasing causes a stack overflow.
-	//alias all this;
 	
 	/++
 	Returns true if the record has been saved to the database
@@ -109,6 +113,7 @@ mixin template Model(string _tableName) {
 			_id_ = database.lastInsertedRowID;
 		}
 	}
+
 	
 	//To do: semantics of deleting an object that's not in the database?
 	void destroy() {

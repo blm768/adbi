@@ -31,7 +31,7 @@ struct Relation(T) {
 
 	typeof(this) where(const(char)[] condition) {
 		auto result = this;
-		result.conditions ~= condition;
+		result.conditions ~= Condition(condition);
 		return result;
 	}
 
@@ -49,5 +49,6 @@ struct Relation(T) {
 		return results.front;
 	}
 
-	const(char)[][] conditions;
+	Condition[] conditions;
 }
+

@@ -63,7 +63,6 @@ class Sqlite3Database: Database {
 		}
 	}
 	
-	//To do: file bug? (Just calling this Query gives an error.)
 	class Query: adbi.database.Query {
 		this(const(char)[] statement) {
 			_statement = statement;
@@ -120,11 +119,19 @@ class Sqlite3Database: Database {
 			if(status)
 				{throw new Sqlite3BindError(status, value);}
 		}
+
+		void bindAt(size_t index, uint value) {
+			bindAt(index, cast(int)value);
+		}
 		
 		void bindAt(size_t index, long value) {
 			int status = sqlite3_bind_int64(_s, cast(int)index + 1, value);
 			if(status)
 				{throw new Sqlite3BindError(status, value);}
+		}
+
+		void bindAt(size_t index, ulong value) {
+			bindAt(index, cast(long)value);
 		}
 		
 		void bindAt(size_t index, double value) {
@@ -145,6 +152,7 @@ class Sqlite3Database: Database {
 			if(status)
 				{throw new Sqlite3BindError(status, blob);}
 		}
+		mixin bindVariant;
 		
 		//To do: error checking?
 		int getInt(size_t index) {
