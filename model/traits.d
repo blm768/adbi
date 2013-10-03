@@ -1,7 +1,6 @@
 module adbi.model.traits;
 
-public import std.traits;
-import std.typetuple;
+public import adbi.traits;
 
 template members(T) {
 	alias TypeTuple!(__traits(allMembers, T)) members;
@@ -15,6 +14,7 @@ template isField(T, string memberName) {
 	enum bool isField = mixin(`__traits(compiles, T.init.` ~ memberName ~ `.offsetof)`);
 }
 
+//TODO: use TemplateMap?
 template fields(T) {
 	private alias TypeTuple!(__traits(allMembers, T)) members;
 	static if(members.length == 0) {

@@ -5,6 +5,8 @@ import std.traits;
 import std.typetuple;
 public import std.variant;
 
+public import adbi.traits;
+
 alias ulong RecordID;
 
 /++
@@ -181,26 +183,15 @@ interface Query {
 	string getColumnName(size_t index);
 }
 
-template BindTypes(T) if(is(T: Query)) {
-	alias BindTypesInternal!(__traits(getOverloads, T, "bindAt")) BindTypes;
+template BindTypesOf(T) if(is(T: Query)) {
+	alias TemplateMap!(BindTypeOf, __traits(getOverloads, T, "bindAt")) BindTypesOf;
 }
 
-private {
-	template BindTypesInternal(overloads ...) {
-		static if(overloads.length == 0) {
-			alias TypeTuple!() BindTypesInternal;
-		} else {
-			private alias ParameterTypeTuple!(overloads[0])[1] BType;
-			static if(is(BType: Variant)) {
-				alias TypeTuple!() BindTypesInternal;
-			} else {
-				alias TypeTuple!(BType, BindTypesInternal!(overloads[1 .. $])) BindTypesInternal;
-			}
-		}
-	}
+template BindTypeOf(alias method) {
+	alias ParameterTypeTuple!(method)[1] BindTypeOf;
 }
 
-pragma(msg, BindTypes!(Query));
+pragma(msg, TemplateMap!(Stringize, BindTypesOf!(Query)));
 
 /**
 For use by Query objects
