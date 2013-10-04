@@ -1,8 +1,7 @@
 module adbi.database;
 
+import std.algorithm;
 import std.string;
-import std.traits;
-import std.typetuple;
 public import std.variant;
 
 public import adbi.traits;
@@ -183,9 +182,7 @@ interface Query {
 	string getColumnName(size_t index);
 }
 
-template BindTypesOf(T) if(is(T: Query)) {
-	alias TemplateMap!(BindTypeOf, __traits(getOverloads, T, "bindAt")) BindTypesOf;
-}
+alias TemplateMap!(BindTypeOf, __traits(getOverloads, Query, "bindAt")) QueryBindTypes;
 
 template BindTypeOf(alias method) {
 	private alias ParameterTypeTuple!(method)[1] secondArgType;
@@ -194,6 +191,22 @@ template BindTypeOf(alias method) {
 	} else {
 		alias secondArgType BindTypeOf;
 	}
+}
+
+private struct BindHandler(T) {
+	//static void doBind(Query q, ubyte[]
+
+}
+
+struct BindValue {
+	enum maxSize = max(TemplateMap!(sizeOf, QueryBindTypes));
+
+	this(T)() {
+
+	}
+
+	private:
+	ubyte[maxSize] _data;
 }
 
 /**
@@ -205,8 +218,16 @@ TODO: convert to a UFCS function?
 */
 mixin template bindVariant() {
 	void bindAt(size_t index, Variant value) {
-		foreach(Type; BindTypesOf!Query) {
-			if(value.type == typeid(Type)) {
+		foreach(Type; QueryBindTypes) {
+			static if(isScalarType!Type) {
+				bool matches = (value.type == typeid(Type));
+			} else static if(isArray!Type) {
+				pragma(msg, Type);
+				import std.stdio;
+				writeln(value.type.toString());
+				bool matches = value.convertsTo!Type;
+			}
+			if(matches) {
 				this.bindAt(index, *(value.peek!Type));
 				return;
 			}

@@ -11,10 +11,39 @@ template TemplateMap(alias Mapper, Tuple ...) {
 	}
 }
 
-template Stringize(T) {
-	enum Stringize = T.stringof;
+template TemplateFilter(alias filter, Tuple ...) {
+	static if(Tuple.length == 0) {
+		alias TypeTuple!() TemplateFilter;
+	} else {
+		static if(filter!(Tuple[0])) {
+			private alias Tuple[0] t;
+		} else {
+			private alias TypeTuple!() t;
+		}
+		alias TypeTuple!(t, TemplateFilter!(filter, Tuple[1 .. $])) TemplateFilter;
+	}
 }
 
-template Stringize(alias sym) {
-	enum Stringize = sym.stringof;
+template TemplateFind(alias filter, Tuple ...) {
+	static if(Tuple.length == 0) {
+		alias TypeTuple!() TemplateFind;
+	} else {
+		static if(filter!(Tuple[0])) {
+			alias Tuple[0] TemplateFind;
+		} else {
+			alias TemplateFind!(filter, Tuple[1 .. $]) TemplateFind;
+		}
+	}
+}
+
+template stringize(T) {
+	enum stringize = T.stringof;
+}
+
+template stringize(alias sym) {
+	enum stringize = sym.stringof;
+}
+
+template sizeOf(T) {
+	enum sizeOf = T.sizeof;
 }
