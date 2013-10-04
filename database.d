@@ -185,8 +185,7 @@ interface Query {
 	string getColumnName(size_t index);
 }
 
-//TODO: remove?
-alias TemplateMap!(BindTypeOf, __traits(getOverloads, Query, "bindAt")) QueryBindTypes;
+alias TupleMap!(BindTypeOf, __traits(getOverloads, Query, "bindAt")) QueryBindTypes;
 
 template BindTypeOf(alias method) {
 	private alias ParameterTypeTuple!(method)[1] secondArgType;
@@ -197,6 +196,7 @@ template BindTypeOf(alias method) {
 	}
 }
 
+//Used internally by BindValue
 private struct BindHandler {
 	static void doBind(T)(Query q, size_t index, const(void)* data) {
 		q.bindAt(index, *(cast(const(T)*)data));
@@ -211,30 +211,49 @@ private struct BindHandler {
 	string function(const(void)*) stringizer;
 }
 
-template bindHandler(T) {
+//Used internally by BindValue
+private template bindHandler(T) {
 	immutable bindHandler = BindHandler(
 			&BindHandler.doBind!T,
 			&BindHandler.doStringize!T,
 		);
 }
 
-struct BindValue {
-	enum maxSize = max(TemplateMap!(sizeOf, QueryBindTypes));
+/**
+Represents a value to be bound to a query
 
-	this(T)(T value) {
+Works a bit like a Variant (but much more specialized)
+*/
+struct BindValue {
+	/**
+	The maximum size of value a BindValue can hold
+	*/
+	enum maxSize = max(TupleMap!(sizeOf, QueryBindTypes));
+
+	/**
+	Initializes this BindValue from a given value
+	*/
+	this(T)(T value) if(T.sizeof <= maxSize) {
 		*(cast(T*)ptr) = value;
 		_handler = &bindHandler!T;
 	}
 
-	void bindTo(Query q, size_t index) {
+	/**
+	Binds this value to a Query
+	*/
+	void bindTo(Query q, size_t index) const {
 		_handler.binder(q, index, ptr);
 	}
 
-	string toString() {
+	///
+	string toString() const {
 		return _handler.stringizer(ptr);
 	}
 
-	@property const(void)* ptr() {
+	/**
+	Returns a pointer to the data
+	*/
+	@property const(void)* ptr() const {
 		return cast(const(void*))&_data;
 	}
 

@@ -1,7 +1,9 @@
 module adbi.model.association;
 
-mixin template association(T, name) {
+mixin template belongsTo(T, string name) {
+	//mixin(typeof(T).stringof ~ " " 
 
+	mixin("RecordID " ~ name ~ "Id;");
 	private:
-	mixin(T.stringof ~ " _" ~ name ~ "_id;");
+	mixin("alias " ~ name ~ "Id _association_id;");
 }

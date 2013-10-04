@@ -50,6 +50,10 @@ struct Relation(T) {
 		return result;
 	}
 
+	Model find(RecordID id) {
+		return where("id = ?", id).front;
+	}
+
 	/**
 	Returns the number of records matching the Relation
 	*/

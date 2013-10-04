@@ -3,35 +3,40 @@ module adbi.traits;
 public import std.traits;
 public import std.typetuple;
 
-template TemplateMap(alias Mapper, Tuple ...) {
+template TupleMap(alias Mapper, Tuple ...) {
 	static if(Tuple.length == 0) {
-		alias TypeTuple!() TemplateMap;
+		alias TypeTuple!() TupleMap;
 	} else {
-		alias TypeTuple!(Mapper!(Tuple[0]), TemplateMap!(Mapper, Tuple[1 .. $])) TemplateMap;
+		alias TypeTuple!(Mapper!(Tuple[0]), TupleMap!(Mapper, Tuple[1 .. $])) TupleMap;
 	}
 }
 
-template TemplateFilter(alias filter, Tuple ...) {
+template TupleFilter(alias filter, Tuple ...) {
 	static if(Tuple.length == 0) {
-		alias TypeTuple!() TemplateFilter;
+		alias TypeTuple!() TupleFilter;
 	} else {
 		static if(filter!(Tuple[0])) {
-			private alias Tuple[0] t;
+			//Is the first member of the tuple a type?
+			static if(is(Tuple[0])) {
+				private alias Tuple[0] t;
+			} else {
+				private enum t = Tuple[0];
+			}
 		} else {
 			private alias TypeTuple!() t;
 		}
-		alias TypeTuple!(t, TemplateFilter!(filter, Tuple[1 .. $])) TemplateFilter;
+		alias TypeTuple!(t, TupleFilter!(filter, Tuple[1 .. $])) TupleFilter;
 	}
 }
 
-template TemplateFind(alias filter, Tuple ...) {
+template tupleContains(alias filter, Tuple ...) {
 	static if(Tuple.length == 0) {
-		alias TypeTuple!() TemplateFind;
+		enum tupleContains = false;
 	} else {
 		static if(filter!(Tuple[0])) {
-			alias Tuple[0] TemplateFind;
+			enum tupleContains = true;
 		} else {
-			alias TemplateFind!(filter, Tuple[1 .. $]) TemplateFind;
+			enum tupleContains = tupleContains!(filter, Tuple[1 .. $]);
 		}
 	}
 }
@@ -46,4 +51,12 @@ template stringize(alias sym) {
 
 template sizeOf(T) {
 	enum sizeOf = T.sizeof;
+}
+
+template memberNames(T) {
+	alias TypeTuple!(__traits(allMembers, T)) memberNames;
+}
+
+template Attributes(alias sym) {
+	alias TypeTuple!(__traits(getAttributes, sym)) Attributes;
 }

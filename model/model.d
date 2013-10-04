@@ -6,9 +6,10 @@ import std.range;
 import std.string;
 
 public import adbi.database;
-public import adbi.model.traits;
+public import adbi.traits;
 public import adbi.statements;
 
+public import adbi.model.association;
 public import adbi.model.join;
 public import adbi.model.relation;
 
@@ -19,7 +20,7 @@ mixin template Model(string _tableName) {
 	enum string tableName = _tableName;
 
 	//TODO: make fixed-length?
-	static immutable(string[]) columnNames = ["id", fields!(typeof(this))];
+	static immutable(string[]) columnNames = ["id", TupleMap!(toColumnName, fields!())];
 	static const(char)[][] columnTypes;
 	
 	/++
@@ -29,8 +30,8 @@ mixin template Model(string _tableName) {
 		return saveQuery.database;
 	}
 
-	static ModelRange!(typeof(this)) query(const(char)[] statement) {
-		return ModelRange!(typeof(this))(database.query(statement));
+	static Query query(const(char)[] statement) {
+		return database.query(statement);
 	}
 
 	static @property Relation!(typeof(this)) all() {
@@ -52,7 +53,7 @@ mixin template Model(string _tableName) {
 	TODO: make type of ID configurable?
 	+/
 	@property RecordID id() {
-		return _id_;
+		return _id;
 	}
 	
 	/++
@@ -82,15 +83,11 @@ mixin template Model(string _tableName) {
 			//To do: update columns.
 			updateQuery.reset();
 			size_t i = 0;
-			foreach(memberName; members!(typeof(this))) {
-				mixin("alias this." ~ memberName ~ " member;");
-				static if(isField!member) {
-					static if(memberName != "_id_") {
-						updateQuery.bindAt(i, member);
-						++i;
-					}
-				}
+			foreach(fieldName; fields!()) {
+				mixin("alias this." ~ fieldName ~ " field;");
+				updateQuery.bindAt(i, field);
 			}
+			//TODO: move up?
 			updateQuery.bindAt(i, id);
 			assert(updateQuery.advance() == QueryStatus.finished);
 			//TODO: remove?
@@ -98,20 +95,16 @@ mixin template Model(string _tableName) {
 		} else {
 			saveQuery.reset();
 			size_t i = 0;
-			foreach(memberName; members!(typeof(this))) {
-				mixin("alias this." ~ memberName ~ " member;");
-				static if(isField!member) {
-					static if(memberName != "_id_") {
-						saveQuery.bindAt(i, member);
-						++i;
-					}
-				}
+			foreach(fieldName; fields!()) {
+				mixin("alias this." ~ fieldName ~ " field;");
+				saveQuery.bindAt(i, field);
+				++i;
 			}
 			//TODO: replace these assertions!
 			assert(saveQuery.advance() == QueryStatus.finished);
 			//To do: remove?
 			saveQuery.reset();
-			_id_ = database.lastInsertedRowID;
+			_id = database.lastInsertedRowID;
 		}
 	}
 
@@ -128,7 +121,7 @@ mixin template Model(string _tableName) {
 	
 	private:
 	@PrimaryKey
-	RecordID _id_;
+	RecordID _id;
 	
 	public:
 	/++
@@ -141,16 +134,17 @@ mixin template Model(string _tableName) {
 			{q.advance();}
 		//TODO: better error message?
 		assert(q.status == QueryStatus.hasData, "Attempt to retrieve data from a query with no valid data available");
+
 		size_t i = startIndex;
+		//_id = q.get!RecordID(i);
+		//++i;
 		typeof(this) instance;
-		foreach(memberName; members!(typeof(this))) {
-			mixin("alias instance." ~ memberName ~ " member;");
-			static if(isField!member) {
-				//For some reason, we can't just assign to member, and &member doesn't work.
-				auto ptr = &__traits(getMember, instance, memberName);
-				*ptr = q.get!(typeof(member))(i);
-				++i;
-			}
+		foreach(fieldName; TypeTuple!("_id", fields!())) {
+			mixin("alias instance." ~ fieldName ~ " field;");
+			//For some reason, we can't just assign to the field, and &field doesn't work.
+			auto ptr = &__traits(getMember, instance, fieldName);
+			*ptr = q.get!(typeof(field))(i);
+			++i;
 		}
 		return instance;
 	}
@@ -162,17 +156,9 @@ mixin template Model(string _tableName) {
 		}
 		columnTypes = ["integer primary key"];
 		enum typeof(this) instance = typeof(this).init;
-		foreach(memberName; members!(typeof(this))) {
-			mixin("alias instance." ~ memberName ~ " member;");
-			static if(isField!member) {
-				alias toColumnName!memberName colName;
-				static if(is(typeof(colName) == string)) {
-					//We exclude the id column for convenience when implementing some of the queries.
-					static if(memberName != "_id_") {
-						columnTypes ~= columnType!(member);
-					}
-				}
-			}
+		foreach(fieldName; fields!()) {
+			mixin("alias instance." ~ fieldName ~ " field;");
+			columnTypes ~= columnType!(field);
 		}
 	}
 	
@@ -187,40 +173,37 @@ mixin template Model(string _tableName) {
 		if(!t) {
 			throw new TableNotFoundException("Table " ~ tableName ~ " not found");
 		}
-		size_t i = 0;
 		enum typeof(this) instance = typeof(this).init;
-		foreach(memberName; members!(typeof(this))) {
-			mixin("alias instance." ~ memberName ~ " member;");
-			//Is this an instance member?
-			//To do: test; this might not always work.
-			static if(isField!member) {
-				alias toColumnName!memberName colName;
-				//Does this member map to a column?
-				static if(is(typeof(colName) == string)) {
-					auto col = colName in t.columnIndices;
-					//Is this column actually in the table?
-					if(!col) {
-						throw new Exception("Column " ~ toColumnName!memberName ~ " does not exist in table " ~ tableName ~ ".");
-					}
-				}
-				++i;
+		foreach(fieldName; TypeTuple!("_id", fields!())) {
+			mixin("alias instance." ~ fieldName ~ " field;");
+			alias toColumnName!fieldName colName;
+			auto col = colName in t.columnIndices;
+			//Is this column actually in the table?
+			if(!col) {
+				throw new Exception("Column " ~ colName ~ " does not exist in table " ~ tableName ~ ".");
 			}
 		}
 		saveQuery = db.query(insertStatement(tableName, columnNames[1 .. $]));
 		updateQuery = db.query(updateStatement(tableName, columnNames[1 .. $]) ~ " WHERE id=?");
 	}
 
-	//TODO: improve?
 	template toColumnName(string memberName) {
 		static if(memberName[0] == '_') {
-			static if(memberName[$ - 1] == '_') {
-				enum string toColumnName = memberName[1 .. $ - 1];
-			} else {
-				alias void toColumnName;
-			}
+			enum string toColumnName = memberName[1 .. $];
 		} else {
 			enum string toColumnName = memberName;
 		}
+	}
+
+	template isField(string name) {
+		alias Attributes!(__traits(getMember, typeof(this), name)) attributes;
+		enum bool isField = tupleContains!(isFieldAttribute, attributes);
+	}
+	
+	template fields() {
+		private alias memberNames!(typeof(this)) names;
+		alias TupleFilter!(isField, names) fields;
+		pragma(msg, fields);
 	}
 }
 
@@ -228,16 +211,20 @@ class TableNotFoundException: Exception {
 	this(string msg) { super(msg); }
 }
 
+enum Field;
 //To do: actually make this do something?
 enum PrimaryKey;
 enum Indexed;
 
+template isFieldAttribute(alias att) {
+	enum isFieldAttribute = is(typeof(att, Field));
+}
 template columnType(alias value) {
 	alias columnBaseType!(typeof(value)) columnType;
 }
 
 template columnBaseType(T) if(isIntegral!T && !isSigned!T) {
-	enum columnBaseType = "unsigned " + columnBaseType(Signed!T);
+	enum columnBaseType = "unsigned " ~ columnBaseType(Signed!T);
 }
 
 template columnBaseType(T: int) {
@@ -258,6 +245,8 @@ template columnBaseType(T: immutable(void)[]) {
 
 /++
 When mixed into a model, this creates a relational link to another model using a foreign key
+
+TODO: remove.
 +/
 mixin template reference(T, string name) {
 	static private Query referenceQuery;
