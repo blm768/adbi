@@ -17,11 +17,9 @@ struct Relation(T) {
 	/**
 	Returns an SQL statement matching the Relation
 	*/
-	@property const(char)[] statement() {
-		auto statement = selectStatement(Model.tableName, Model.columnNames);
-		if(conditions.length) {
-			statement ~= whereClause(conditions);
-		}
+	@property Statement statement() {
+		auto base = selectClause(Model.tableName, Model.columnNames);
+		auto statement = Statement(base, whereClause(conditions));
 		return statement;
 	}
 	
@@ -30,7 +28,10 @@ struct Relation(T) {
 	TODO: caching?
 	*/
 	@property Query query() {
-		return Model.database.query(statement);
+		auto statement = this.statement;
+		auto query = Model.database.query(statement.text);
+		statement.bindValues(query);
+		return query;
 	}
 
 	///
@@ -43,9 +44,9 @@ struct Relation(T) {
 	/**
 	Returns a new Relation with the condition added to it
 	*/
-	typeof(this) where(const(char)[] condition) {
+	typeof(this) where(T ...)(const(char)[] condition, T values) {
 		auto result = this;
-		result.conditions ~= Condition(condition);
+		result.conditions ~= Condition(condition, values);
 		return result;
 	}
 
@@ -53,11 +54,10 @@ struct Relation(T) {
 	Returns the number of records matching the Relation
 	*/
 	size_t count() {
-		auto statement = selectStatement(Model.tableName, "count(*)");
-		if(conditions.length) {
-			statement ~= whereClause(conditions);
-		}
-		auto query = Model.database.query(statement);
+		auto base = selectClause(Model.tableName, "count(*)");
+		auto statement = Statement(base, whereClause(conditions));
+		auto query = Model.database.query(statement.text);
+		statement.bindValues(query);
 		query.advance();
 		return query.get!int(0);
 	}

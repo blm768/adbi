@@ -7,42 +7,80 @@ import std.range;
 import std.string;
 import std.variant;
 
+import adbi.database;
+
+struct Clause {
+	const(char)[] expression;
+	Variant[] values;
+
+	void bindValues(Query q, size_t index) {
+		foreach(value; values) {
+			q.bindAt(index, value);
+			++index;
+		}
+	}
+}
+
+struct Statement {
+	this(Clause[] clauses ...) pure in {
+		assert(clauses.length > 0);
+	} body {
+		auto text = appender(clauses[0].expression);
+		foreach(clause; clauses[1 .. $]) {
+			if(clause.expression.length) {
+				text.put(" ");
+				text.put(clause.expression);
+			}
+		}
+		
+		this.text = text.data;
+		//The clauses array may contain a stack reference, so it must
+		//be duplicated.
+		//TODO: optimize?
+		this.clauses = clauses.dup;
+	}
+
+
+	const(char)[] text;
+	Clause[] clauses;
+
+	void bindValues(Query q) {
+		size_t index = 0;
+		foreach(clause; clauses) {
+			clause.bindValues(q, index);
+			index += clause.values.length;
+		}
+	}
+}
+
+unittest {
+	
+}
+
 struct Condition {
+	this(T ...)(const(char)[] expression, T values) {
+		//TODO: validate the number of binding slots provided?
+		this.expression = expression;
+		this.values = uninitializedArray!(typeof(this.values))(values.length);
+		foreach(i, value; values) {
+			this.values[i] = Variant(value);
+		}
+	}
 	const(char)[] expression;
 	Variant[] values;
 }
 
-string whereClause(Condition[] conditions) {
-	return " WHERE " ~ conditions.map!(c => "(%s)".format(c.expression))().join(" AND ");
-}
-
-//TODO: use immutable(char)[] where possible?
-const(char)[] buildStatement(const(char)[] base, const(char)[][] clauses ...) pure {
-	auto app = appender(base);
-	foreach(clause; clauses) {
-		if(clause.length) {
-			app.put(" ");
-			app.put(clause);
-		}
+Clause whereClause(Condition[] conditions) {
+	auto expression = "WHERE " ~ conditions.map!(c => "(%s)".format(c.expression)).join(" AND ");
+	Appender!(Variant[]) values;
+	foreach(c; conditions) {
+		values.put(c.values);
 	}
-	return app.data;
+	return Clause(expression, values.data);
 }
 
 unittest {
-	assert(buildStatement("testing", "1", "2", "3") == "testing 1 2 3");
-	assert(buildStatement("testing") == "testing");
-}
 
-string whereClause(const(char[])[] conditions) pure {
-	if(conditions.length) {
-		return " WHERE " ~ conditions.map!(s => "(%s)".format(s))().join(" AND ");
-	} else {
-		return "";
-	}
-}
-
-unittest {
-	assert(whereClause([]) == "");
 }
 
 string insertStatement(const(char)[] table, const(char[])[] columns) pure {
@@ -63,9 +101,9 @@ unittest {
 	
 }
 
-string selectStatement(const(char)[] table, const(char[])[] columns ...) pure {
+Clause selectClause(const(char)[] table, const(char[])[] columns ...) pure {
 	auto cols = columns.map!(s => s[])();
-	return "SELECT %s FROM %s".format(cols.join(", "), table);
+	return Clause("SELECT %s FROM %s".format(cols.join(", "), table));
 }
 
 unittest {
