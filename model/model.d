@@ -20,6 +20,7 @@ mixin template Model(string _tableName) {
 	enum string tableName = _tableName;
 
 	//TODO: make fixed-length?
+	//TODO: how to handle models with no fields?
 	static immutable(string[]) columnNames = ["id", TupleMap!(toColumnName, fields!())];
 	static const(char)[][] columnTypes;
 	
@@ -203,7 +204,6 @@ mixin template Model(string _tableName) {
 	template fields() {
 		private alias memberNames!(typeof(this)) names;
 		alias TupleFilter!(isField, names) fields;
-		pragma(msg, fields);
 	}
 }
 
@@ -217,8 +217,9 @@ enum PrimaryKey;
 enum Indexed;
 
 template isFieldAttribute(alias att) {
-	enum isFieldAttribute = is(typeof(att, Field));
+	enum isFieldAttribute = __traits(isSame, att, Field);
 }
+
 template columnType(alias value) {
 	alias columnBaseType!(typeof(value)) columnType;
 }
