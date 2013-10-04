@@ -1,8 +1,8 @@
 module adbi.database;
 
 import std.algorithm;
+import std.conv;
 import std.string;
-public import std.variant;
 
 public import adbi.traits;
 
@@ -131,7 +131,6 @@ interface Query {
 	void bindAt(size_t index, double value);
 	void bindAt(size_t index, const(char)[] value);
 	void bindAt(size_t index, const(void)[] value);
-	void bindAt(size_t index, Variant value);
 	
 	void bind(T...)(T args) {
 		foreach(i, value; args) {
@@ -159,16 +158,20 @@ interface Query {
 		alias getDouble get;
 	}
 
-	template get(T: char[]) {
+	template get(T) if(is(char[]: T)) {
 		alias getString get; 
 	}
 
 	T get(T: string)(size_t index) {
-		return cast(string)getString(index);
+		return cast(immutable)getString(index);
 	}
 
-	template get(T: void[]) {
+	template get(T) if(is(void[]: T)) {
 		alias getBlob get;
+	}
+
+	T get(T: immutable(void)[])(size_t index) {
+		return cast(immutable)getBlob(index);
 	}
 
 	int getInt(size_t index);
@@ -182,56 +185,61 @@ interface Query {
 	string getColumnName(size_t index);
 }
 
+//TODO: remove?
 alias TemplateMap!(BindTypeOf, __traits(getOverloads, Query, "bindAt")) QueryBindTypes;
 
 template BindTypeOf(alias method) {
 	private alias ParameterTypeTuple!(method)[1] secondArgType;
-	static if(is(secondArgType: Variant)) {
+	static if(is(secondArgType: BindValue)) {
 		alias TypeTuple!() BindTypeOf;
 	} else {
 		alias secondArgType BindTypeOf;
 	}
 }
 
-private struct BindHandler(T) {
-	//static void doBind(Query q, ubyte[]
+private struct BindHandler {
+	static void doBind(T)(Query q, size_t index, const(void)* data) {
+		q.bindAt(index, *(cast(const(T)*)data));
+	}
 
+	//TODO: special handling for types that are already strings?
+	static string doStringize(T)(const(void)* data) {
+		return (*(cast(const(T)*)data)).to!string();
+	}
+
+	void function(Query, size_t, const(void)*) binder;
+	string function(const(void)*) stringizer;
+}
+
+template bindHandler(T) {
+	immutable bindHandler = BindHandler(
+			&BindHandler.doBind!T,
+			&BindHandler.doStringize!T,
+		);
 }
 
 struct BindValue {
 	enum maxSize = max(TemplateMap!(sizeOf, QueryBindTypes));
 
-	this(T)() {
+	this(T)(T value) {
+		*(cast(T*)ptr) = value;
+		_handler = &bindHandler!T;
+	}
 
+	void bindTo(Query q, size_t index) {
+		_handler.binder(q, index, ptr);
+	}
+
+	string toString() {
+		return _handler.stringizer(ptr);
+	}
+
+	@property const(void)* ptr() {
+		return cast(const(void*))&_data;
 	}
 
 	private:
-	ubyte[maxSize] _data;
+	void[maxSize] _data = void;
+	immutable(BindHandler)* _handler;
 }
 
-/**
-For use by Query objects
-
-Implements bindAt!(size_t, Variant)
-
-TODO: convert to a UFCS function?
-*/
-mixin template bindVariant() {
-	void bindAt(size_t index, Variant value) {
-		foreach(Type; QueryBindTypes) {
-			static if(isScalarType!Type) {
-				bool matches = (value.type == typeid(Type));
-			} else static if(isArray!Type) {
-				pragma(msg, Type);
-				import std.stdio;
-				writeln(value.type.toString());
-				bool matches = value.convertsTo!Type;
-			}
-			if(matches) {
-				this.bindAt(index, *(value.peek!Type));
-				return;
-			}
-		}
-		assert(false);
-	}
-}

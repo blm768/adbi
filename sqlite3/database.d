@@ -152,7 +152,6 @@ class Sqlite3Database: Database {
 			if(status)
 				{throw new Sqlite3BindError(status, blob);}
 		}
-		mixin bindVariant;
 		
 		//To do: error checking?
 		int getInt(size_t index) {

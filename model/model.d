@@ -1,7 +1,8 @@
 module adbi.model.model;
 
 public import core.exception;
-public import std.array;
+import std.array;
+import std.range;
 import std.string;
 
 public import adbi.database;
@@ -235,8 +236,6 @@ template columnType(alias value) {
 	alias columnBaseType!(typeof(value)) columnType;
 }
 
-template columnBaseType(T) {}
-
 template columnBaseType(T) if(isIntegral!T && !isSigned!T) {
 	enum columnBaseType = "unsigned " + columnBaseType(Signed!T);
 }
@@ -249,7 +248,7 @@ template columnBaseType(T: long) {
 	enum columnBaseType = "integer";
 }
 
-template columnBaseType(T: char[]) {
+template columnBaseType(T) if(is(T: const(char)[])) {
 	enum columnBaseType = "varchar";
 }
 

@@ -11,11 +11,11 @@ import adbi.database;
 
 struct Clause {
 	const(char)[] expression;
-	Variant[] values;
+	BindValue[] values;
 
 	void bindValues(Query q, size_t index) {
 		foreach(value; values) {
-			q.bindAt(index, value);
+			value.bindTo(q, index);
 			++index;
 		}
 	}
@@ -63,16 +63,16 @@ struct Condition {
 		this.expression = expression;
 		this.values = uninitializedArray!(typeof(this.values))(values.length);
 		foreach(i, value; values) {
-			this.values[i] = Variant(value);
+			this.values[i] = BindValue(value);
 		}
 	}
 	const(char)[] expression;
-	Variant[] values;
+	BindValue[] values;
 }
 
 Clause whereClause(Condition[] conditions) {
 	auto expression = "WHERE " ~ conditions.map!(c => "(%s)".format(c.expression)).join(" AND ");
-	Appender!(Variant[]) values;
+	Appender!(BindValue[]) values;
 	foreach(c; conditions) {
 		values.put(c.values);
 	}
