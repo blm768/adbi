@@ -51,6 +51,7 @@ struct Relation(T) {
 	}
 
 	Model find(RecordID id) {
+		//TODO: add a limit clause!
 		return where("id = ?", id).front;
 	}
 

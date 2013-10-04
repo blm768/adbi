@@ -235,24 +235,6 @@ template columnBaseType(T: immutable(void)[]) {
 }
 
 /++
-When mixed into a model, this creates a relational link to another model using a foreign key
-
-TODO: remove.
-+/
-mixin template reference(T, string name) {
-	static private Query referenceQuery;
-	mixin("RecordID " ~ name ~ "_id;");
-	mixin("@property T " ~ name ~ `(){
-		if(!referenceQuery) {
-			referenceQuery = database.query("SELECT * FROM " ~ T.tableName ~ " WHERE id = ? LIMIT 1;");
-		}
-		referenceQuery.reset();
-		referenceQuery.bind(` ~ name ~ `_id);
-		return T.fromQuery(referenceQuery);
-	}`);
-}
-
-/++
 Represents a range of models from a query
 +/
 struct ModelRange(T) {
