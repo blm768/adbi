@@ -103,6 +103,7 @@ struct Column {
 	string name;
 }
 
+//TODO: handle QueryStatus.busy?
 enum QueryStatus {
 	notStarted, hasData, finished, busy
 }

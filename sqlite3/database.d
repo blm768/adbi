@@ -72,7 +72,7 @@ class Sqlite3Database: Database {
 		QueryStatus advance() {
 			int qStatus = sqlite3_step(_s);
 			with(QueryStatus) switch(qStatus) {
-				//To do: handle busy case
+				//TODO: handle busy queries.
 				case SQLITE_BUSY:
 					_status =  busy;
 					break;

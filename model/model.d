@@ -81,18 +81,14 @@ mixin template Model(string _tableName) {
 	+/
 	void save() {
 		if(persisted) {
-			//To do: update columns.
 			updateQuery.reset();
 			size_t i = 0;
 			foreach(fieldName; fields!()) {
 				mixin("alias this." ~ fieldName ~ " field;");
 				updateQuery.bindAt(i, field);
 			}
-			//TODO: move up?
 			updateQuery.bindAt(i, id);
 			assert(updateQuery.advance() == QueryStatus.finished);
-			//TODO: remove?
-			updateQuery.reset();
 		} else {
 			saveQuery.reset();
 			size_t i = 0;
@@ -101,10 +97,7 @@ mixin template Model(string _tableName) {
 				saveQuery.bindAt(i, field);
 				++i;
 			}
-			//TODO: replace these assertions!
-			assert(saveQuery.advance() == QueryStatus.finished);
-			//To do: remove?
-			saveQuery.reset();
+			saveQuery.advance();
 			_id = database.lastInsertedRowID;
 		}
 	}
@@ -133,8 +126,7 @@ mixin template Model(string _tableName) {
 	 } body {
 		if(q.status == QueryStatus.notStarted)
 			{q.advance();}
-		//TODO: better error message?
-		assert(q.status == QueryStatus.hasData, "Attempt to retrieve data from a query with no valid data available");
+		assert(q.status == QueryStatus.hasData, "Attempt to retrieve data from a query with no data");
 
 		size_t i = startIndex;
 		//_id = q.get!RecordID(i);
@@ -142,9 +134,7 @@ mixin template Model(string _tableName) {
 		typeof(this) instance;
 		foreach(fieldName; TypeTuple!("_id", fields!())) {
 			mixin("alias instance." ~ fieldName ~ " field;");
-			//For some reason, we can't just assign to the field, and &field doesn't work.
-			auto ptr = &__traits(getMember, instance, fieldName);
-			*ptr = q.get!(typeof(field))(i);
+			__traits(getMember, instance, fieldName) = q.get!(typeof(field))(i);
 			++i;
 		}
 		return instance;
