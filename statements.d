@@ -71,6 +71,10 @@ struct Condition {
 }
 
 Clause whereClause(Condition[] conditions) {
+	if(conditions.length == 0) {
+		return Clause();
+	}
+
 	auto expression = "WHERE " ~ conditions.map!(c => "(%s)".format(c.expression)).join(" AND ");
 	Appender!(BindValue[]) values;
 	foreach(c; conditions) {
