@@ -174,8 +174,8 @@ mixin template Model(string _tableName) {
 				throw new Exception("Column " ~ colName ~ " does not exist in table " ~ tableName ~ ".");
 			}
 		}
-		saveQuery = db.query(insertStatement(tableName, columnNames[1 .. $]));
-		updateQuery = db.query(updateStatement(tableName, columnNames[1 .. $]) ~ " WHERE id=?");
+		saveQuery = db.query(insertClause(tableName, columnNames[1 .. $]));
+		updateQuery = db.query(updateClause(tableName, columnNames[1 .. $]) ~ " WHERE id=?");
 	}
 
 	template toColumnName(string memberName) {

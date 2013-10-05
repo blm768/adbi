@@ -87,7 +87,8 @@ unittest {
 
 }
 
-string insertStatement(const(char)[] table, const(char[])[] columns) pure {
+//TODO: return a Clause instead of a string?
+string insertClause(const(char)[] table, const(char[])[] columns) pure {
 	auto cols = columns.map!(s => s[])();
 	return "INSERT INTO %s (%s) VALUES (%s)".format(table, cols.join(","), std.range.repeat("?", columns.length).join(","));
 }
@@ -96,7 +97,7 @@ unittest {
 
 }
 
-string updateStatement(const(char)[] table, const(char[])[] columns) pure {
+string updateClause(const(char)[] table, const(char[])[] columns) pure {
 	auto cols = columns.map!(s => s[])();
 	return "UPDATE %s SET %s=?".format(table, cols.join("=?, "));
 }
@@ -108,6 +109,15 @@ unittest {
 Clause selectClause(const(char)[] table, const(char[])[] columns ...) pure {
 	auto cols = columns.map!(s => s[])();
 	return Clause("SELECT %s FROM %s".format(cols.join(", "), table));
+}
+
+Clause limitClause(size_t limit) {
+	//TODO: find a cleaner way of handling the limit?
+	if(limit == size_t.max) {
+		return Clause();
+	} else {
+		return Clause("LIMIT " ~ limit.to!string());
+	}
 }
 
 unittest {

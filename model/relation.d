@@ -19,7 +19,7 @@ struct Relation(T) {
 	*/
 	@property Statement statement() {
 		auto base = selectClause(Model.tableName, Model.columnNames);
-		auto statement = Statement(base, whereClause(conditions));
+		auto statement = Statement(base, whereClause(conditions), limitClause(_limit));
 		return statement;
 	}
 	
@@ -50,9 +50,17 @@ struct Relation(T) {
 		return result;
 	}
 
+	typeof(this) limit(size_t limit) in {
+		assert(limit < size_t.max);
+	} body {
+		auto result = this;
+		//TODO: clip limit parameter by current limit?
+		result._limit = limit;
+		return result;
+	}
+
 	Model find(RecordID id) {
-		//TODO: add a limit clause!
-		return where("id = ?", id).front;
+		return where("id = ?", id).limit(1).front;
 	}
 
 	/**
@@ -68,4 +76,7 @@ struct Relation(T) {
 	}
 
 	Condition[] conditions;
+	private:
+	//TODO: allow direct access?
+	size_t _limit = size_t.max;
 }
