@@ -248,8 +248,12 @@ struct ModelRange(T) {
 	
 	///
 	@property Model front() {
-		//TODO: cache?
-		return Model.fromQuery(query);
+		if(empty) {
+			throw new RangeError;
+		} else {
+			//TODO: cache?
+			return Model.fromQuery(query);
+		}
 	}
 	
 	void popFront() {
@@ -265,6 +269,7 @@ struct ModelRange(T) {
 		if(query.status == QueryStatus.notStarted) {
 			query.advance();
 		}
+		//TODO: change to "query.status == QueryStatus.finished"?
 		return query.status != QueryStatus.hasData;
 	}
 }
