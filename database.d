@@ -177,6 +177,7 @@ interface Query {
 		return cast(immutable)getBlob(index);
 	}
 
+	//Note: currently broken due to DMD bug #11190
 	Nullable!T get(T: Nullable!T)(size_t index) {
 		if(isColumnNull(index)) {
 			return Nullable!T();

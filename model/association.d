@@ -1,12 +1,8 @@
 module adbi.model.association;
 
-mixin template hasOne(Association, string name, bool isNullable = true) {
-	static if(isNullable) {
-		alias Nullable!RecordID IDType;
-	} else {
-		alias RecordID IDType;
-	}
+public import std.typecons;
 
+mixin template hasOne(Association, string name, bool isNullable = true) {
 	mixin(
 		q{@property Association* } ~ name ~ q{() {
 			static if(isNullable) {
@@ -14,9 +10,10 @@ mixin template hasOne(Association, string name, bool isNullable = true) {
 					return null;
 				}
 			}
+			//Has the association been cached?
 			if(!_association) {
-				//_association = new Association;
-				//*_association = Association.all.find(" ~ name ~ "_id);
+				_association = new Association;
+				*_association = Association.all.find(_association_id);
 			}
 			return _association;
 		}}
@@ -40,14 +37,15 @@ mixin template hasOne(Association, string name, bool isNullable = true) {
 
 	
 	mixin(
-		q{@Field @property IDType } ~ name ~ q{_id() {
-			/+if(_association) {
+		q{@Field @property auto } ~ name ~ q{_id() {
+			//Try to update the ID from the association.
+			if(_association) {
 				if(_association.persisted) {
 					_association_id = _association.id;
 				} else {
-					throw new Exception("Association " ~ name ~ " has no ID.");
+					throw new Exception(`Association "` ~ name ~ `" has no ID.`);
 				}
-			}+/
+			}
 			return _association_id;
 		}}
 	);
