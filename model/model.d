@@ -214,6 +214,10 @@ template columnType(alias value) {
 	alias columnBaseType!(typeof(value)) columnType;
 }
 
+template columnBaseType(T: Nullable!T) {
+	enum columnBaseType = columnBaseType!T;
+}
+
 template columnBaseType(T) if(isIntegral!T && !isSigned!T) {
 	enum columnBaseType = "unsigned " ~ columnBaseType(Signed!T);
 }

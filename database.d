@@ -1,5 +1,7 @@
 module adbi.database;
 
+public import std.typecons;
+
 import std.algorithm;
 import std.conv;
 import std.string;
@@ -175,6 +177,14 @@ interface Query {
 		return cast(immutable)getBlob(index);
 	}
 
+	Nullable!T get(T: Nullable!T)(size_t index) {
+		if(isColumnNull(index)) {
+			return Nullable!T();
+		} else {
+			return Nullable!T(get!T(index));
+		}
+	}
+
 	int getInt(size_t index);
 	uint getUInt(size_t index);
 	long getLong(size_t index);
@@ -182,6 +192,8 @@ interface Query {
 	double getDouble(size_t index);
 	char[] getString(size_t index);
 	void[] getBlob(size_t index);
+
+	bool isColumnNull(size_t index);
 	
 	string getColumnName(size_t index);
 }
@@ -224,6 +236,8 @@ private template bindHandler(T) {
 Represents a value to be bound to a query
 
 Works a bit like a Variant (but much more specialized)
+
+TODO: move to statements.d?
 */
 struct BindValue {
 	/**

@@ -181,6 +181,10 @@ class Sqlite3Database: Database {
 		void[] getBlob(size_t index) {
 			return sqlite3_column_blob(_s, cast(int)index)[0 .. sqlite3_column_bytes(_s, cast(int)index)].dup;
 		}
+
+		bool isColumnNull(size_t index) {
+			return (sqlite3_column_type(_s, cast(int)index) == SQLITE_NULL);
+		}
 		
 		string getColumnName(size_t index) {
 			return sqlite3_column_name(_s, cast(int)index).to!string;
