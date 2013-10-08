@@ -19,7 +19,6 @@ Mixin template that makes a struct act as a model
 mixin template Model(string _tableName) {
 	enum string tableName = _tableName;
 
-	//TODO: make fixed-length?
 	//TODO: how to handle models with no fields?
 	static immutable(string[]) columnNames = ["id", TupleMap!(toColumnName, fields!())];
 	static const(char)[][] columnTypes;
@@ -85,16 +84,16 @@ mixin template Model(string _tableName) {
 			size_t i = 0;
 			foreach(fieldName; fields!()) {
 				mixin("alias this." ~ fieldName ~ " field;");
-				updateQuery.bindAt(i, field);
+				updateQuery.bind(i, field);
 			}
-			updateQuery.bindAt(i, id);
+			updateQuery.bind(i, id);
 			assert(updateQuery.advance() == QueryStatus.finished);
 		} else {
 			saveQuery.reset();
 			size_t i = 0;
 			foreach(fieldName; fields!()) {
 				mixin("alias this." ~ fieldName ~ " field;");
-				saveQuery.bindAt(i, field);
+				saveQuery.bind(i, field);
 				++i;
 			}
 			saveQuery.advance();

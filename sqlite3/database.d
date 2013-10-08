@@ -41,7 +41,7 @@ class Sqlite3Database: Database {
 
 	override bool tableExists(string name) {
 		auto query = this.query("SELECT count(*) FROM sqlite_master WHERE type='table' AND name=?");
-		query.bind(name);
+		query.bind(0, name);
 		query.advance();
 		return query.getInt(0) == 1;
 	}
@@ -114,40 +114,40 @@ class Sqlite3Database: Database {
 			return this.outer;
 		}
 		
-		void bindAt(size_t index, int value) {
+		void doBind(size_t index, int value) {
 			int status = sqlite3_bind_int(_s, cast(int)index + 1, value);
 			if(status)
 				{throw new Sqlite3BindError(status, value);}
 		}
 
-		void bindAt(size_t index, uint value) {
-			bindAt(index, cast(int)value);
+		void doBind(size_t index, uint value) {
+			doBind(index, cast(int)value);
 		}
 		
-		void bindAt(size_t index, long value) {
+		void doBind(size_t index, long value) {
 			int status = sqlite3_bind_int64(_s, cast(int)index + 1, value);
 			if(status)
 				{throw new Sqlite3BindError(status, value);}
 		}
 
-		void bindAt(size_t index, ulong value) {
-			bindAt(index, cast(long)value);
+		void doBind(size_t index, ulong value) {
+			doBind(index, cast(long)value);
 		}
 		
-		void bindAt(size_t index, double value) {
+		void doBind(size_t index, double value) {
 			int status = sqlite3_bind_double(_s, cast(int)index + 1, value);
 			if(status)
 				{throw new Sqlite3BindError(status, value);}
 		}
 		
-		void bindAt(size_t index, const(char)[] text) {
+		void doBind(size_t index, const(char)[] text) {
 			//To do: optimize.
 			int status = sqlite3_bind_text(_s, cast(int)index + 1, text.ptr, cast(int)text.length, SQLITE_TRANSIENT);
 			if(status)
 				{throw new Sqlite3BindError(status, text);}
 		}
 		
-		void bindAt(size_t index, const(void)[] blob) {
+		void doBind(size_t index, const(void)[] blob) {
 			int status = sqlite3_bind_blob(_s, cast(int)index + 1, blob.ptr, cast(int)blob.length, SQLITE_TRANSIENT);
 			if(status)
 				{throw new Sqlite3BindError(status, blob);}

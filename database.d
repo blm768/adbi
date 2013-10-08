@@ -127,18 +127,16 @@ interface Query {
 	@property const(char)[] statement();
 	@property Database database();
 	
-	void bindAt(size_t index, int value);
-	void bindAt(size_t index, uint value);
-	void bindAt(size_t index, long value);
-	void bindAt(size_t index, ulong value);
-	void bindAt(size_t index, double value);
-	void bindAt(size_t index, const(char)[] value);
-	void bindAt(size_t index, const(void)[] value);
+	void doBind(size_t index, int value);
+	void doBind(size_t index, uint value);
+	void doBind(size_t index, long value);
+	void doBind(size_t index, ulong value);
+	void doBind(size_t index, double value);
+	void doBind(size_t index, const(char)[] value);
+	void doBind(size_t index, const(void)[] value);
 	
-	void bind(T...)(T args) {
-		foreach(i, value; args) {
-			bindAt(i, value);
-		}
+	void bind(T)(size_t index, T value) {
+		doBind(index, value);
 	}
 	
 	template get(T: int) {
@@ -177,8 +175,16 @@ interface Query {
 		return cast(immutable)getBlob(index);
 	}
 
-	//Note: currently broken due to DMD bug #11190
-	Nullable!T get(T: Nullable!T)(size_t index) {
+	//Workaround for DMD bug 11190
+	template isNullable(T) {
+		enum isNullable = false;
+	}
+
+	template isNullable(T: Nullable!T) {
+		enum isNullable = true;
+	}
+
+	Nullable!T get(T)(size_t index) if(isNullable!T) {
 		if(isColumnNull(index)) {
 			return Nullable!T();
 		} else {
@@ -199,21 +205,21 @@ interface Query {
 	string getColumnName(size_t index);
 }
 
-alias TupleMap!(BindTypeOf, __traits(getOverloads, Query, "bindAt")) QueryBindTypes;
+alias TupleMap!(BinderTypeOf, __traits(getOverloads, Query, "doBind")) QueryBinderTypes;
 
-template BindTypeOf(alias method) {
+template BinderTypeOf(alias method) {
 	private alias ParameterTypeTuple!(method)[1] secondArgType;
 	static if(is(secondArgType: BindValue)) {
-		alias TypeTuple!() BindTypeOf;
+		alias BinderTypeOf = TypeTuple!();
 	} else {
-		alias secondArgType BindTypeOf;
+		alias BinderTypeOf = secondArgType;
 	}
 }
 
 //Used internally by BindValue
 private struct BindHandler {
 	static void doBind(T)(Query q, size_t index, const(void)* data) {
-		q.bindAt(index, *(cast(const(T)*)data));
+		q.bind(index, *(cast(const(T)*)data));
 	}
 
 	//TODO: special handling for types that are already strings?
@@ -223,35 +229,32 @@ private struct BindHandler {
 
 	void function(Query, size_t, const(void)*) binder;
 	string function(const(void)*) stringizer;
-}
 
-//Used internally by BindValue
-private template bindHandler(T) {
-	immutable bindHandler = BindHandler(
+	template handlerFor(T) {
+		static immutable handlerFor = BindHandler(
 			&BindHandler.doBind!T,
 			&BindHandler.doStringize!T,
 		);
+	}
 }
 
 /**
 Represents a value to be bound to a query
 
 Works a bit like a Variant (but much more specialized)
-
-TODO: move to statements.d?
 */
 struct BindValue {
 	/**
 	The maximum size of value a BindValue can hold
 	*/
-	enum maxSize = max(TupleMap!(sizeOf, QueryBindTypes));
+	enum maxSize = max(TupleMap!(sizeOf, QueryBinderTypes));
 
 	/**
 	Initializes this BindValue from a given value
 	*/
 	this(T)(T value) if(T.sizeof <= maxSize) {
 		*(cast(T*)ptr) = value;
-		_handler = &bindHandler!T;
+		_handler = &BindHandler.handlerFor!T;
 	}
 
 	/**
