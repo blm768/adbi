@@ -139,7 +139,7 @@ interface Query {
 	/**
 	Like bindAt, but handles std.typecons.Nullable correctly
 
-	TODO: rename?
+	TODO: rename? (to bindNullableAt?)
 	*/
 	void bindValueAt(T)(size_t index, T value) {
 		static if(isNullable!T) {

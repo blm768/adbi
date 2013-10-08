@@ -52,9 +52,9 @@ mixin template hasOne(Association, string name, bool isNullable = true) {
 	
 	mixin(
 		q{@Field @property void } ~ name ~ q{_id(RecordID id) {
-			if(id != _association_id) {
-				_association = null;
-			}
+			//TODO: don't clear the cached association if the ID matches
+			//the old one?
+			_association = null;
 			_association_id = id;
 		}}
 	);
