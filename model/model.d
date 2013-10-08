@@ -72,7 +72,6 @@ mixin template Model(string _tableName) {
 		db.createTable(tableName, columnNames, columnTypes);
 	}
 
-	//To do: versions that are told if the object exists in the database?
 	/++
 	Saves the record to the database.
 	
@@ -84,16 +83,16 @@ mixin template Model(string _tableName) {
 			size_t i = 0;
 			foreach(fieldName; fields!()) {
 				mixin("alias this." ~ fieldName ~ " field;");
-				updateQuery.bind(i, field);
+				updateQuery.bindValueAt(i, field);
 			}
-			updateQuery.bind(i, id);
+			updateQuery.bindAt(i, id);
 			assert(updateQuery.advance() == QueryStatus.finished);
 		} else {
 			saveQuery.reset();
 			size_t i = 0;
 			foreach(fieldName; fields!()) {
 				mixin("alias this." ~ fieldName ~ " field;");
-				saveQuery.bind(i, field);
+				saveQuery.bindValueAt(i, field);
 				++i;
 			}
 			saveQuery.advance();

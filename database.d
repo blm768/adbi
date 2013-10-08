@@ -127,18 +127,34 @@ interface Query {
 	@property const(char)[] statement();
 	@property Database database();
 	
-	void doBind(size_t index, int value);
-	void doBind(size_t index, uint value);
-	void doBind(size_t index, long value);
-	void doBind(size_t index, ulong value);
-	void doBind(size_t index, double value);
-	void doBind(size_t index, const(char)[] value);
-	void doBind(size_t index, const(void)[] value);
-	
-	void bind(T)(size_t index, T value) {
-		doBind(index, value);
+	void bindAt(size_t index, int value);
+	void bindAt(size_t index, uint value);
+	void bindAt(size_t index, long value);
+	void bindAt(size_t index, ulong value);
+	void bindAt(size_t index, double value);
+	void bindAt(size_t index, const(char)[] value);
+	void bindAt(size_t index, const(void)[] value);
+	void bindNullAt(size_t index);
+
+	/**
+	Like bindAt, but handles std.typecons.Nullable correctly
+
+	TODO: rename?
+	*/
+	void bindValueAt(T)(size_t index, T value) {
+		static if(isNullable!T) {
+			if(value.isNull()) {
+				bindNullAt(index);
+				return;
+			}
+		}
+		//TODO: just alias to the bindAt functions rather than
+		//calling them?
+		//(could be faster, but if the optimizer inlines the
+		//outer call, there should be no speed difference.)
+		bindAt(index, value);
 	}
-	
+
 	template get(T: int) {
 		alias getInt get;
 	}
@@ -176,6 +192,8 @@ interface Query {
 	}
 
 	//Workaround for DMD bug 11190
+	//However, if we start supporting Nullable!(T, nullValue),
+	//we might end up keeping (but moving!) this.
 	template isNullable(T) {
 		enum isNullable = false;
 	}
@@ -205,7 +223,7 @@ interface Query {
 	string getColumnName(size_t index);
 }
 
-alias TupleMap!(BinderTypeOf, __traits(getOverloads, Query, "doBind")) QueryBinderTypes;
+alias TupleMap!(BinderTypeOf, __traits(getOverloads, Query, "bindAt")) QueryBinderTypes;
 
 template BinderTypeOf(alias method) {
 	private alias ParameterTypeTuple!(method)[1] secondArgType;
@@ -219,7 +237,7 @@ template BinderTypeOf(alias method) {
 //Used internally by BindValue
 private struct BindHandler {
 	static void doBind(T)(Query q, size_t index, const(void)* data) {
-		q.bind(index, *(cast(const(T)*)data));
+		q.bindValueAt(index, *(cast(const(T)*)data));
 	}
 
 	//TODO: special handling for types that are already strings?
@@ -246,8 +264,10 @@ Works a bit like a Variant (but much more specialized)
 struct BindValue {
 	/**
 	The maximum size of value a BindValue can hold
+
+	TODO: make room for Nullable's extra boolean field in a less hackish way.
 	*/
-	enum maxSize = max(TupleMap!(sizeOf, QueryBinderTypes));
+	enum maxSize = max(TupleMap!(sizeOf, QueryBinderTypes)) + bool.sizeof;
 
 	/**
 	Initializes this BindValue from a given value
