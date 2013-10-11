@@ -1,7 +1,8 @@
 module adbi.model.model;
 
 public import core.exception;
-import std.array;
+//import std.array;
+//import std.conv;
 import std.range;
 import std.string;
 
@@ -84,6 +85,7 @@ mixin template Model(string _tableName) {
 			foreach(fieldName; fields!()) {
 				mixin("alias this." ~ fieldName ~ " field;");
 				updateQuery.bindValueAt(i, field);
+				++i;
 			}
 			updateQuery.bindAt(i, id);
 			assert(updateQuery.advance() == QueryStatus.finished);
@@ -176,6 +178,24 @@ mixin template Model(string _tableName) {
 		updateQuery = db.query(updateClause(tableName, columnNames[1 .. $]) ~ " WHERE id=?");
 	}
 
+	//TODO: make pure?
+	string toString() {
+		import std.array;
+		import std.conv;
+		auto text = appender(typeof(this).stringof ~ "(");
+		foreach(i, field; fields!()) {
+			mixin("alias this." ~ field ~ " value;");
+			text.put(field);
+			text.put(": ");
+			text.put(value.to!string());
+			static if(i < (fields!().length - 1)) {
+				text.put(", ");
+			}
+		}
+		text.put(")");
+		return text.data;
+	}
+
 	template toColumnName(string memberName) {
 		static if(memberName[0] == '_') {
 			enum string toColumnName = memberName[1 .. $];
@@ -251,6 +271,7 @@ struct ModelRange(T) {
 	///
 	@property Model front() {
 		if(empty) {
+			//TODO: throw something else?
 			throw new RangeError;
 		} else {
 			//TODO: cache?
