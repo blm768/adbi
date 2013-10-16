@@ -140,6 +140,8 @@ class Sqlite3Database: Database {
 				{throw new Sqlite3BindError(status, value);}
 		}
 		
+		//TODO: how to handle embedded null characters?
+		//(SQLite only reads up to the first null.)
 		void bindAt(size_t index, const(char)[] text) {
 			//To do: optimize.
 			int status = sqlite3_bind_text(_s, cast(int)index + 1, text.ptr, cast(int)text.length, SQLITE_TRANSIENT);

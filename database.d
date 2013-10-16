@@ -175,14 +175,16 @@ interface Query {
 		alias getDouble get;
 	}
 
-	template get(T) if(is(char[]: T)) {
-		alias getString get; 
+	template get(T) if(is(T: const(char)[])) {
+		alias getString get;
 	}
 
 	T get(T: string)(size_t index) {
 		return cast(immutable)getString(index);
 	}
 
+	//The "is" expression is reversed because any
+	//array would be implicitly convertible to a void[].
 	template get(T) if(is(void[]: T)) {
 		alias getBlob get;
 	}

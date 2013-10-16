@@ -252,6 +252,13 @@ template columnBaseType(T) if(is(T: const(char)[])) {
 	enum columnBaseType = "varchar";
 }
 
+//For non-immutable void[]
+template columnBaseType(T) if(is(void[]: T)) {
+	enum columnBaseType = "blob";
+}
+
+//For immutable void[]
+//TODO: find a cleaner way of doing this?
 template columnBaseType(T: immutable(void)[]) {
 	enum columnBaseType = "blob";
 }
