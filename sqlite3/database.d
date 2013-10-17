@@ -8,6 +8,7 @@ import std.traits;
 
 public import adbi.database;
 
+//TODO: remove?
 pragma(lib, "sqlite3");
 
 class Sqlite3Database: Database {
@@ -141,7 +142,7 @@ class Sqlite3Database: Database {
 		}
 		
 		//TODO: how to handle embedded null characters?
-		//(SQLite only reads up to the first null.)
+		//(SQLite may only read up to the first null.)
 		void bindAt(size_t index, const(char)[] text) {
 			//To do: optimize.
 			int status = sqlite3_bind_text(_s, cast(int)index + 1, text.ptr, cast(int)text.length, SQLITE_TRANSIENT);
@@ -191,7 +192,7 @@ class Sqlite3Database: Database {
 			return sqlite3_column_blob(_s, cast(int)index)[0 .. sqlite3_column_bytes(_s, cast(int)index)].dup;
 		}
 
-		bool isColumnNull(size_t index) {
+		bool columnIsNull(size_t index) {
 			return (sqlite3_column_type(_s, cast(int)index) == SQLITE_NULL);
 		}
 		

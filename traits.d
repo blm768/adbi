@@ -60,3 +60,11 @@ template memberNames(T) {
 template Attributes(alias sym) {
 	alias TypeTuple!(__traits(getAttributes, sym)) Attributes;
 }
+
+template isNullable(T) {
+	enum isNullable = false;
+}
+
+template isNullable(T: Nullable!T) {
+	enum isNullable = true;
+}

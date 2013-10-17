@@ -143,7 +143,7 @@ interface Query {
 	*/
 	void bindValueAt(T)(size_t index, T value) {
 		static if(isNullable!T) {
-			if(value.isNull()) {
+			if(value.isNull) {
 				bindNullAt(index);
 				return;
 			}
@@ -193,22 +193,18 @@ interface Query {
 		return cast(immutable)getBlob(index);
 	}
 
-	//Workaround for DMD bug 11190
-	//However, if we start supporting Nullable!(T, nullValue),
-	//we might end up keeping (but moving!) this.
-	template isNullable(T) {
-		enum isNullable = false;
+	template NullableType(T: Nullable!T) {
+		alias NullableType = T;
 	}
 
-	template isNullable(T: Nullable!T) {
-		enum isNullable = true;
-	}
-
-	Nullable!T get(T)(size_t index) if(isNullable!T) {
-		if(isColumnNull(index)) {
-			return Nullable!T();
-		} else {
-			return Nullable!T(get!T(index));
+	//Currently broken due to DMD bug 11190
+	version(none) {
+		Nullable!T get(T: Nullable!T)(size_t index) {
+			if(columnIsNull(index)) {
+				return Nullable!T();
+			} else {
+				return Nullable!T(get!T(index));
+			}
 		}
 	}
 
@@ -220,7 +216,7 @@ interface Query {
 	char[] getString(size_t index);
 	void[] getBlob(size_t index);
 
-	bool isColumnNull(size_t index);
+	bool columnIsNull(size_t index);
 	
 	string getColumnName(size_t index);
 }

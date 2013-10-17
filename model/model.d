@@ -129,11 +129,16 @@ mixin template Model(string _tableName) {
 		assert(q.status == QueryStatus.hasData, "Attempt to retrieve data from a query with no data");
 
 		size_t i = startIndex;
-		//_id = q.get!RecordID(i);
-		//++i;
 		typeof(this) instance;
 		foreach(fieldName; TypeTuple!("_id", fields!())) {
 			mixin("alias instance." ~ fieldName ~ " field;");
+			//Workaround for DMD bug 11190
+			static if(isNullable!(typeof(field))) {
+				if(q.columnIsNull(i)) {
+					__traits(getMember, instance, fieldName).nullify();
+					continue;
+				}
+			}
 			__traits(getMember, instance, fieldName) = q.get!(typeof(field))(i);
 			++i;
 		}
